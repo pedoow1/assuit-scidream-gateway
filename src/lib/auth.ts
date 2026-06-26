@@ -35,37 +35,83 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
     loading: true,
   });
 
+  async function ensureProfile(user: User): Promise<ProfileRow | null> {
+    const { data: existing, error: selectError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (selectError) throw selectError;
+    if (existing) return existing as ProfileRow;
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        email: user.email ?? null,
+        full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+      })
+      .select("*")
+      .single();
+
+    if (insertError) throw insertError;
+    return inserted as ProfileRow;
+  }
+
   async function loadFor(session: Session | null) {
     if (!session?.user) {
       setState({ session: null, user: null, profile: null, roles: [], loading: false });
       return;
     }
     const userId = session.user.id;
-    const [{ data: profile }, { data: roleRows }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-    ]);
-    setState({
-      session,
-      user: session.user,
-      profile: (profile as ProfileRow | null) ?? null,
-      roles: (roleRows ?? []).map((r) => r.role as AppRole),
-      loading: false,
-    });
+    try {
+      const [profile, { data: roleRows, error: rolesError }] = await Promise.all([
+        ensureProfile(session.user),
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+      ]);
+      if (rolesError) throw rolesError;
+      setState({
+        session,
+        user: session.user,
+        profile,
+        roles: (roleRows ?? []).map((r) => r.role as AppRole),
+        loading: false,
+      });
+    } catch (error) {
+      console.error("[auth] failed to load user profile", error);
+      setState({ session, user: session.user, profile: null, roles: [], loading: false });
+    }
   }
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) loadFor(data.session);
-    });
+    const fallbackTimer = window.setTimeout(() => {
+      if (mounted) setState((current) => ({ ...current, loading: false }));
+    }, 8000);
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        window.clearTimeout(fallbackTimer);
+        void loadFor(data.session);
+      })
+      .catch((error) => {
+        console.error("[auth] getSession failed", error);
+        if (mounted) setState({ session: null, user: null, profile: null, roles: [], loading: false });
+      });
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        loadFor(session);
+        window.setTimeout(() => {
+          if (mounted) void loadFor(session);
+        }, 0);
       }
     });
     return () => {
       mounted = false;
+      window.clearTimeout(fallbackTimer);
       sub.subscription.unsubscribe();
     };
   }, []);

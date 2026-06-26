@@ -27,6 +27,7 @@ function Dashboard() {
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/auth" });
+    else if (!profile) navigate({ to: "/complete-profile" });
     else if (profile?.verification_status === "incomplete") navigate({ to: "/complete-profile" });
     else if (profile?.verification_status === "pending" || profile?.verification_status === "rejected") {
       navigate({ to: "/pending" });
