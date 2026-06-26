@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 
 interface Star {
   id: number;
@@ -10,15 +10,19 @@ interface Star {
 }
 
 export function CosmicBackground({ density = 40 }: { density?: number }) {
-  const stars = useMemo<Star[]>(() => {
-    return Array.from({ length: density }).map((_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2.5 + 0.5,
-      delay: Math.random() * 4,
-      duration: 2 + Math.random() * 4,
-    }));
+  const [stars, setStars] = useState<Star[]>([]);
+
+  useEffect(() => {
+    setStars(
+      Array.from({ length: density }).map((_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: Math.random() * 2.5 + 0.5,
+        delay: Math.random() * 4,
+        duration: 2 + Math.random() * 4,
+      })),
+    );
   }, [density]);
 
   return (
@@ -38,7 +42,6 @@ export function CosmicBackground({ density = 40 }: { density?: number }) {
           }}
         />
       ))}
-      {/* Floating gold orb */}
       <div
         className="absolute -top-32 -right-32 h-96 w-96 rounded-full opacity-30 blur-3xl"
         style={{ background: "radial-gradient(circle, var(--gold), transparent 70%)" }}
