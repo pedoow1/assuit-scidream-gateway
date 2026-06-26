@@ -153,6 +153,13 @@ function SubjectDetailPage() {
                   </div>
                   {subject.description && <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{subject.description}</p>}
                 </div>
+                <Link
+                  to="/subjects/$subjectId/quizzes"
+                  params={{ subjectId: subject.id }}
+                  className="inline-flex items-center gap-2 self-start rounded-full bg-gradient-cosmic px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-rose transition hover:shadow-glow"
+                >
+                  اختبارات المادة ✨
+                </Link>
               </div>
             </div>
 
