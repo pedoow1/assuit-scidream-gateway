@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2, Clock, XCircle, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,15 +12,44 @@ export const Route = createFileRoute("/pending")({
 });
 
 function PendingPage() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refresh } = useAuth();
   const navigate = useNavigate();
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // التوجيه الأساسي
   useEffect(() => {
     if (loading) return;
-    if (!user) navigate({ to: "/auth" });
-    else if (profile?.verification_status === "verified") navigate({ to: "/dashboard" });
-    else if (profile?.verification_status === "incomplete") navigate({ to: "/complete-profile" });
+    if (!user) { navigate({ to: "/auth" }); return; }
+    if (profile?.verification_status === "verified") { navigate({ to: "/dashboard" }); return; }
+    if (profile?.verification_status === "incomplete") { navigate({ to: "/complete-profile" }); return; }
   }, [user, profile, loading, navigate]);
+
+  // Polling كل 10 ثواني عشان نعرف لو الأدمن فعّل الحساب
+  useEffect(() => {
+    if (loading || !user) return;
+    if (profile?.verification_status !== "pending") return;
+
+    pollingRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("verification_status")
+        .eq("id", user.id)
+        .single();
+
+      if (data?.verification_status === "verified") {
+        // حدّث الـ auth state وروّح للداشبورد
+        await refresh();
+        navigate({ to: "/dashboard" });
+      } else if (data?.verification_status === "rejected") {
+        // حدّث عشان يظهر سبب الرفض
+        await refresh();
+      }
+    }, 10000); // كل 10 ثواني
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [loading, user, profile?.verification_status, refresh, navigate]);
 
   if (loading || !user || !profile) {
     return (
@@ -65,13 +94,17 @@ function PendingPage() {
               <div className="mx-auto mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-aurora">
                 <Clock className="h-7 w-7 text-foreground animate-pulse" />
               </div>
-              <h1 className="mt-4 font-display text-2xl">جاري مراجعة بياناتك</h1>
+              <h1 className="mt-4 font-display text-2xl">تلقينا طلبك ✨</h1>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                فريق Dream Team بيراجع بياناتك دلوقتي ✨ هتقدر تدخل المنصة بمجرد ما يتأكدوا إنك من طلاب الكلية.
+                فريق Dream Team بيراجع بياناتك دلوقتي — هتقدر تدخل المنصة بمجرد ما يتأكدوا إنك من طلاب الكلية.
               </p>
               <div className="mt-5 rounded-xl bg-secondary/40 p-4 text-right text-xs text-muted-foreground">
                 <div><span className="font-semibold text-foreground">الاسم:</span> {profile.full_name}</div>
                 <div className="mt-1"><span className="font-semibold text-foreground">الرقم الأكاديمي:</span> {profile.academic_id}</div>
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>بنتحقق من حالة طلبك تلقائياً…</span>
               </div>
             </>
           )}
