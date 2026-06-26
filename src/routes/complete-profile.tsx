@@ -14,7 +14,8 @@ export const Route = createFileRoute("/complete-profile")({
 
 function CompleteProfilePage() {
   const { user, profile, roles, loading, refresh } = useAuth();
-  const isAdmin = roles.includes("admin") || roles.includes("super_admin");
+  const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
+  const isAdmin = isOwnerAdmin || roles.includes("admin") || roles.includes("super_admin");
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +32,10 @@ function CompleteProfilePage() {
       navigate({ to: "/auth" });
       return;
     }
+    if (isOwnerAdmin) {
+      navigate({ to: "/dashboard" });
+      return;
+    }
     if (!profile) return;
     if (profile.verification_status === "pending") navigate({ to: "/pending" });
     if (profile?.verification_status === "verified") navigate({ to: "/dashboard" });
@@ -40,7 +45,7 @@ function CompleteProfilePage() {
       setPhone(profile.phone ?? "");
       if (profile.batch_year) setBatchYear(String(profile.batch_year));
     }
-  }, [user, profile, loading, navigate]);
+  }, [user, profile, loading, navigate, isOwnerAdmin]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +102,7 @@ function CompleteProfilePage() {
     }
   }
 
-  if (loading || !user) {
+  if (loading || !user || isOwnerAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />

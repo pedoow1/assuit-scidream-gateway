@@ -18,6 +18,12 @@ export interface ProfileRow {
 
 export type AppRole = "super_admin" | "admin" | "student";
 
+const SUPER_ADMIN_EMAIL = "abdalahkotp31@gmail.com";
+
+function isSuperAdminEmail(email?: string | null) {
+  return email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
+}
+
 export interface AuthState {
   session: Session | null;
   user: User | null;
@@ -36,6 +42,7 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
   });
 
   async function ensureProfile(user: User): Promise<ProfileRow | null> {
+    const superAdmin = isSuperAdminEmail(user.email);
     const { data: existing, error: selectError } = await supabase
       .from("profiles")
       .select("*")
@@ -43,7 +50,19 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
       .maybeSingle();
 
     if (selectError) throw selectError;
-    if (existing) return existing as ProfileRow;
+    if (existing) {
+      if (superAdmin && existing.verification_status !== "verified") {
+        const { data: updated, error: updateError } = await supabase
+          .from("profiles")
+          .update({ verification_status: "verified", is_verified: true })
+          .eq("id", user.id)
+          .select("*")
+          .single();
+        if (updateError) throw updateError;
+        return updated as ProfileRow;
+      }
+      return existing as ProfileRow;
+    }
 
     const { data: inserted, error: insertError } = await supabase
       .from("profiles")
@@ -52,6 +71,8 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
         email: user.email ?? null,
         full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
         avatar_url: user.user_metadata?.avatar_url ?? null,
+        verification_status: superAdmin ? "verified" : "incomplete",
+        is_verified: superAdmin,
       })
       .select("*")
       .single();
@@ -67,16 +88,21 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
     }
     const userId = session.user.id;
     try {
+      const superAdmin = isSuperAdminEmail(session.user.email);
       const [profile, { data: roleRows, error: rolesError }] = await Promise.all([
         ensureProfile(session.user),
         supabase.from("user_roles").select("role").eq("user_id", userId),
       ]);
       if (rolesError) throw rolesError;
+      const loadedRoles = (roleRows ?? []).map((r) => r.role as AppRole);
+      const roles = superAdmin && !loadedRoles.includes("super_admin")
+        ? ["super_admin" as AppRole, ...loadedRoles]
+        : loadedRoles;
       setState({
         session,
         user: session.user,
         profile,
-        roles: (roleRows ?? []).map((r) => r.role as AppRole),
+        roles,
         loading: false,
       });
     } catch (error) {
