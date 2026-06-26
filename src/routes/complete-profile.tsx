@@ -30,7 +30,8 @@ function CompleteProfilePage() {
       navigate({ to: "/auth" });
       return;
     }
-    if (profile?.verification_status === "pending") navigate({ to: "/pending" });
+    if (!profile) return;
+    if (profile.verification_status === "pending") navigate({ to: "/pending" });
     if (profile?.verification_status === "verified") navigate({ to: "/dashboard" });
     if (profile) {
       setFullName(profile.full_name ?? "");

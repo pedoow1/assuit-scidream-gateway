@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -23,26 +22,43 @@ function AuthPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
-      else setChecking(false);
-    });
+    let active = true;
+    const timer = window.setTimeout(() => {
+      if (active) setChecking(false);
+    }, 5000);
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        window.clearTimeout(timer);
+        if (data.session) navigate({ to: "/dashboard" });
+        else setChecking(false);
+      })
+      .catch((error) => {
+        console.error("[auth] session check failed", error);
+        if (active) setChecking(false);
+      });
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [navigate]);
 
   async function handleGoogle() {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
       });
-      if (result.error) {
+      if (error) {
+        console.error(error);
         toast.error("حصلت مشكلة في تسجيل الدخول، حاول مرة تانية");
         setLoading(false);
-        return;
       }
-      if (result.redirected) return;
-      toast.success("تم تسجيل الدخول ✨");
-      navigate({ to: "/dashboard" });
     } catch (e) {
       console.error(e);
       toast.error("حصلت مشكلة، حاول مرة تانية");
