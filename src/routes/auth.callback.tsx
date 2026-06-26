@@ -5,9 +5,6 @@ import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/auth/callback")({
-  head: () => ({
-    meta: [{ title: "جاري تسجيل الدخول — Assuit SciDream" }],
-  }),
   component: AuthCallback,
 });
 
@@ -15,38 +12,20 @@ function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let active = true;
-
-    // انتظر الـ session تتحمل من Supabase بعد الـ OAuth redirect
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!active) return;
-      if (event === "SIGNED_IN" && session) {
-        sub.subscription.unsubscribe();
-        navigate({ to: "/dashboard" });
-      }
-    });
-
-    // fallback: لو الـ session موجودة أصلاً
+    // Supabase بيقرأ الـ hash تلقائياً لو استدعيت getSession
     supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
       if (data.session) {
-        sub.subscription.unsubscribe();
         navigate({ to: "/dashboard" });
+      } else {
+        // لو مش لاقي session، استنى الـ onAuthStateChange
+        const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === "SIGNED_IN" && session) {
+            sub.subscription.unsubscribe();
+            navigate({ to: "/dashboard" });
+          }
+        });
       }
     });
-
-    // timeout fallback بعد 10 ثواني
-    const fallback = window.setTimeout(() => {
-      if (!active) return;
-      sub.subscription.unsubscribe();
-      navigate({ to: "/auth" });
-    }, 10000);
-
-    return () => {
-      active = false;
-      window.clearTimeout(fallback);
-      sub.subscription.unsubscribe();
-    };
   }, [navigate]);
 
   return (
