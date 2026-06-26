@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2 } from "lucide-react";
-import { useAuth, isAdminRole, type ProfileRow } from "@/lib/auth";
+import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
