@@ -91,21 +91,27 @@ function Dashboard() {
         <div className="mt-8">
           <h2 className="font-display text-xl">الأقسام</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {QUICK.map((q) => (
-              <button
-                key={q.label}
-                className="group cosmic-card flex flex-col items-center gap-2 rounded-2xl p-5 text-center transition hover:-translate-y-0.5 hover:shadow-glow"
-                onClick={() => alert("هذا القسم قيد التطوير في المرحلة القادمة ✨")}
-              >
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${q.color} text-foreground`}>
-                  <q.icon className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-medium">{q.label}</span>
-              </button>
-            ))}
+            {QUICK.map((q) => {
+              const inner = (
+                <>
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${q.color} text-foreground`}>
+                    <q.icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium">{q.label}</span>
+                </>
+              );
+              const cls = "group cosmic-card flex flex-col items-center gap-2 rounded-2xl p-5 text-center transition hover:-translate-y-0.5 hover:shadow-glow";
+              return q.to ? (
+                <Link key={q.label} to={q.to} className={cls}>{inner}</Link>
+              ) : (
+                <button key={q.label} className={cls} onClick={() => alert("هذا القسم قيد التطوير في المرحلة القادمة ✨")}>
+                  {inner}
+                </button>
+              );
+            })}
           </div>
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            ✨ الأقسام دي بتيتم تجهيزها في المرحلة القادمة من المشروع.
+            ✨ باقي الأقسام بتيتم تجهيزها — المواد جاهزة دلوقتي.
           </p>
         </div>
       </main>
