@@ -18,6 +18,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsSubjectIdRouteImport } from './routes/subjects.$subjectId'
+import { Route as SubjectsSubjectIdQuizzesIndexRouteImport } from './routes/subjects.$subjectId.quizzes.index'
 
 const SubjectsRoute = SubjectsRouteImport.update({
   id: '/subjects',
@@ -64,6 +65,12 @@ const SubjectsSubjectIdRoute = SubjectsSubjectIdRouteImport.update({
   path: '/$subjectId',
   getParentRoute: () => SubjectsRoute,
 } as any)
+const SubjectsSubjectIdQuizzesIndexRoute =
+  SubjectsSubjectIdQuizzesIndexRouteImport.update({
+    id: '/quizzes/',
+    path: '/quizzes/',
+    getParentRoute: () => SubjectsSubjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,7 +81,8 @@ export interface FileRoutesByFullPath {
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,7 +93,8 @@ export interface FileRoutesByTo {
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,7 +106,8 @@ export interface FileRoutesById {
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes'
   id:
     | '__root__'
     | '/'
@@ -133,6 +145,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -211,15 +224,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsSubjectIdRouteImport
       parentRoute: typeof SubjectsRoute
     }
+    '/subjects/$subjectId/quizzes/': {
+      id: '/subjects/$subjectId/quizzes/'
+      path: '/quizzes'
+      fullPath: '/subjects/$subjectId/quizzes/'
+      preLoaderRoute: typeof SubjectsSubjectIdQuizzesIndexRouteImport
+      parentRoute: typeof SubjectsSubjectIdRoute
+    }
   }
 }
 
+interface SubjectsSubjectIdRouteChildren {
+  SubjectsSubjectIdQuizzesIndexRoute: typeof SubjectsSubjectIdQuizzesIndexRoute
+}
+
+const SubjectsSubjectIdRouteChildren: SubjectsSubjectIdRouteChildren = {
+  SubjectsSubjectIdQuizzesIndexRoute: SubjectsSubjectIdQuizzesIndexRoute,
+}
+
+const SubjectsSubjectIdRouteWithChildren =
+  SubjectsSubjectIdRoute._addFileChildren(SubjectsSubjectIdRouteChildren)
+
 interface SubjectsRouteChildren {
-  SubjectsSubjectIdRoute: typeof SubjectsSubjectIdRoute
+  SubjectsSubjectIdRoute: typeof SubjectsSubjectIdRouteWithChildren
 }
 
 const SubjectsRouteChildren: SubjectsRouteChildren = {
-  SubjectsSubjectIdRoute: SubjectsSubjectIdRoute,
+  SubjectsSubjectIdRoute: SubjectsSubjectIdRouteWithChildren,
 }
 
 const SubjectsRouteWithChildren = SubjectsRoute._addFileChildren(
