@@ -19,6 +19,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsSubjectIdRouteImport } from './routes/subjects.$subjectId'
 import { Route as SubjectsSubjectIdQuizzesIndexRouteImport } from './routes/subjects.$subjectId.quizzes.index'
+import { Route as SubjectsSubjectIdQuizzesQuizIdRouteImport } from './routes/subjects.$subjectId.quizzes.$quizId'
 
 const SubjectsRoute = SubjectsRouteImport.update({
   id: '/subjects',
@@ -71,6 +72,12 @@ const SubjectsSubjectIdQuizzesIndexRoute =
     path: '/quizzes/',
     getParentRoute: () => SubjectsSubjectIdRoute,
   } as any)
+const SubjectsSubjectIdQuizzesQuizIdRoute =
+  SubjectsSubjectIdQuizzesQuizIdRouteImport.update({
+    id: '/quizzes/$quizId',
+    path: '/quizzes/$quizId',
+    getParentRoute: () => SubjectsSubjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -94,6 +102,7 @@ export interface FileRoutesByTo {
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesById {
@@ -107,6 +116,7 @@ export interface FileRoutesById {
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRouteTypes {
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes'
   id:
     | '__root__'
@@ -145,6 +157,7 @@ export interface FileRouteTypes {
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes/'
   fileRoutesById: FileRoutesById
 }
@@ -231,14 +244,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsSubjectIdQuizzesIndexRouteImport
       parentRoute: typeof SubjectsSubjectIdRoute
     }
+    '/subjects/$subjectId/quizzes/$quizId': {
+      id: '/subjects/$subjectId/quizzes/$quizId'
+      path: '/quizzes/$quizId'
+      fullPath: '/subjects/$subjectId/quizzes/$quizId'
+      preLoaderRoute: typeof SubjectsSubjectIdQuizzesQuizIdRouteImport
+      parentRoute: typeof SubjectsSubjectIdRoute
+    }
   }
 }
 
 interface SubjectsSubjectIdRouteChildren {
+  SubjectsSubjectIdQuizzesQuizIdRoute: typeof SubjectsSubjectIdQuizzesQuizIdRoute
   SubjectsSubjectIdQuizzesIndexRoute: typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 
 const SubjectsSubjectIdRouteChildren: SubjectsSubjectIdRouteChildren = {
+  SubjectsSubjectIdQuizzesQuizIdRoute: SubjectsSubjectIdQuizzesQuizIdRoute,
   SubjectsSubjectIdQuizzesIndexRoute: SubjectsSubjectIdQuizzesIndexRoute,
 }
 
