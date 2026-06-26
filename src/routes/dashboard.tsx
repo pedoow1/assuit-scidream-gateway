@@ -23,18 +23,20 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
 function Dashboard() {
   const { user, profile, roles, loading } = useAuth();
   const navigate = useNavigate();
+  const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
 
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/auth" });
+    else if (isOwnerAdmin) return;
     else if (!profile) navigate({ to: "/complete-profile" });
-    else if (profile?.verification_status === "incomplete") navigate({ to: "/complete-profile" });
-    else if (profile?.verification_status === "pending" || profile?.verification_status === "rejected") {
+    else if (profile.verification_status === "incomplete") navigate({ to: "/complete-profile" });
+    else if (profile.verification_status === "pending" || profile.verification_status === "rejected") {
       navigate({ to: "/pending" });
     }
-  }, [user, profile, loading, navigate]);
+  }, [user, profile, loading, navigate, isOwnerAdmin]);
 
-  if (loading || !user || !profile) {
+  if (loading || !user || (!profile && !isOwnerAdmin)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -42,7 +44,7 @@ function Dashboard() {
     );
   }
 
-  const isAdmin = isAdminRole(roles);
+  const isAdmin = isOwnerAdmin || isAdminRole(roles);
 
   return (
     <div className="relative min-h-screen">
@@ -81,7 +83,7 @@ function Dashboard() {
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent">أهلاً بيك</div>
           <h1 className="mt-2 font-display text-3xl md:text-4xl">
-            {profile.full_name?.split(" ")[0] ?? "يا عبقري"} ✨
+            {profile?.full_name?.split(" ")[0] ?? "يا أدمن"} ✨
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             رحلتك في كلية العلوم بدأت — اختار قسم وابدأ.
