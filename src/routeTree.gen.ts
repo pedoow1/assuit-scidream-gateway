@@ -11,12 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as GpaRouteImport } from './routes/gpa'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsSubjectIdRouteImport } from './routes/subjects.$subjectId'
+import { Route as SubjectsSubjectIdQuizzesIndexRouteImport } from './routes/subjects.$subjectId.quizzes.index'
+import { Route as SubjectsSubjectIdQuizzesQuizIdRouteImport } from './routes/subjects.$subjectId.quizzes.$quizId'
 
 const SubjectsRoute = SubjectsRouteImport.update({
   id: '/subjects',
@@ -26,6 +29,11 @@ const SubjectsRoute = SubjectsRouteImport.update({
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GpaRoute = GpaRouteImport.update({
+  id: '/gpa',
+  path: '/gpa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -58,6 +66,18 @@ const SubjectsSubjectIdRoute = SubjectsSubjectIdRouteImport.update({
   path: '/$subjectId',
   getParentRoute: () => SubjectsRoute,
 } as any)
+const SubjectsSubjectIdQuizzesIndexRoute =
+  SubjectsSubjectIdQuizzesIndexRouteImport.update({
+    id: '/quizzes/',
+    path: '/quizzes/',
+    getParentRoute: () => SubjectsSubjectIdRoute,
+  } as any)
+const SubjectsSubjectIdQuizzesQuizIdRoute =
+  SubjectsSubjectIdQuizzesQuizIdRouteImport.update({
+    id: '/quizzes/$quizId',
+    path: '/quizzes/$quizId',
+    getParentRoute: () => SubjectsSubjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,9 +85,12 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
+  '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,9 +98,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
+  '/subjects/$subjectId/quizzes': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,9 +112,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
-  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
+  '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
+  '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -98,9 +127,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
+    | '/subjects/$subjectId/quizzes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -108,9 +140,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
+    | '/subjects/$subjectId/quizzes'
   id:
     | '__root__'
     | '/'
@@ -118,9 +153,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
+    | '/subjects/$subjectId/quizzes/$quizId'
+    | '/subjects/$subjectId/quizzes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,6 +167,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompleteProfileRoute: typeof CompleteProfileRoute
   DashboardRoute: typeof DashboardRoute
+  GpaRoute: typeof GpaRoute
   PendingRoute: typeof PendingRoute
   SubjectsRoute: typeof SubjectsRouteWithChildren
 }
@@ -147,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gpa': {
+      id: '/gpa'
+      path: '/gpa'
+      fullPath: '/gpa'
+      preLoaderRoute: typeof GpaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -191,15 +237,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsSubjectIdRouteImport
       parentRoute: typeof SubjectsRoute
     }
+    '/subjects/$subjectId/quizzes/': {
+      id: '/subjects/$subjectId/quizzes/'
+      path: '/quizzes'
+      fullPath: '/subjects/$subjectId/quizzes/'
+      preLoaderRoute: typeof SubjectsSubjectIdQuizzesIndexRouteImport
+      parentRoute: typeof SubjectsSubjectIdRoute
+    }
+    '/subjects/$subjectId/quizzes/$quizId': {
+      id: '/subjects/$subjectId/quizzes/$quizId'
+      path: '/quizzes/$quizId'
+      fullPath: '/subjects/$subjectId/quizzes/$quizId'
+      preLoaderRoute: typeof SubjectsSubjectIdQuizzesQuizIdRouteImport
+      parentRoute: typeof SubjectsSubjectIdRoute
+    }
   }
 }
 
+interface SubjectsSubjectIdRouteChildren {
+  SubjectsSubjectIdQuizzesQuizIdRoute: typeof SubjectsSubjectIdQuizzesQuizIdRoute
+  SubjectsSubjectIdQuizzesIndexRoute: typeof SubjectsSubjectIdQuizzesIndexRoute
+}
+
+const SubjectsSubjectIdRouteChildren: SubjectsSubjectIdRouteChildren = {
+  SubjectsSubjectIdQuizzesQuizIdRoute: SubjectsSubjectIdQuizzesQuizIdRoute,
+  SubjectsSubjectIdQuizzesIndexRoute: SubjectsSubjectIdQuizzesIndexRoute,
+}
+
+const SubjectsSubjectIdRouteWithChildren =
+  SubjectsSubjectIdRoute._addFileChildren(SubjectsSubjectIdRouteChildren)
+
 interface SubjectsRouteChildren {
-  SubjectsSubjectIdRoute: typeof SubjectsSubjectIdRoute
+  SubjectsSubjectIdRoute: typeof SubjectsSubjectIdRouteWithChildren
 }
 
 const SubjectsRouteChildren: SubjectsRouteChildren = {
-  SubjectsSubjectIdRoute: SubjectsSubjectIdRoute,
+  SubjectsSubjectIdRoute: SubjectsSubjectIdRouteWithChildren,
 }
 
 const SubjectsRouteWithChildren = SubjectsRoute._addFileChildren(
@@ -212,19 +285,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompleteProfileRoute: CompleteProfileRoute,
   DashboardRoute: DashboardRoute,
+  GpaRoute: GpaRoute,
   PendingRoute: PendingRoute,
   SubjectsRoute: SubjectsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
