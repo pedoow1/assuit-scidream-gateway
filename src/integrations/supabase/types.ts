@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      content_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          external_url: string | null
+          file_url: string | null
+          folder_id: string
+          id: string
+          sort_order: number
+          title: string
+          type: string
+          youtube_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          external_url?: string | null
+          file_url?: string | null
+          folder_id: string
+          id?: string
+          sort_order?: number
+          title: string
+          type: string
+          youtube_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          external_url?: string | null
+          file_url?: string | null
+          folder_id?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          type?: string
+          youtube_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          sort_order: number
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folders_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           academic_id: string | null
@@ -59,6 +154,54 @@ export type Database = {
           rejection_reason?: string | null
           updated_at?: string
           verification_status?: string
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          code: string
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          credit_hours: number | null
+          department: string
+          description: string | null
+          id: string
+          name_ar: string
+          name_en: string | null
+          semester: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          code: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_hours?: number | null
+          department: string
+          description?: string | null
+          id?: string
+          name_ar: string
+          name_en?: string | null
+          semester: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          code?: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_hours?: number | null
+          department?: string
+          description?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string | null
+          semester?: number
+          updated_at?: string
+          year?: number
         }
         Relationships: []
       }

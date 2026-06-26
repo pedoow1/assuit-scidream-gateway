@@ -9,13 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubjectsSubjectIdRouteImport } from './routes/subjects.$subjectId'
 
+const SubjectsRoute = SubjectsRouteImport.update({
+  id: '/subjects',
+  path: '/subjects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
@@ -46,6 +53,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubjectsSubjectIdRoute = SubjectsSubjectIdRouteImport.update({
+  id: '/$subjectId',
+  path: '/$subjectId',
+  getParentRoute: () => SubjectsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/pending': typeof PendingRoute
+  '/subjects': typeof SubjectsRouteWithChildren
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/pending': typeof PendingRoute
+  '/subjects': typeof SubjectsRouteWithChildren
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +87,8 @@ export interface FileRoutesById {
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/pending': typeof PendingRoute
+  '/subjects': typeof SubjectsRouteWithChildren
+  '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,8 +99,18 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/dashboard'
     | '/pending'
+    | '/subjects'
+    | '/subjects/$subjectId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/auth' | '/complete-profile' | '/dashboard' | '/pending'
+  to:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/complete-profile'
+    | '/dashboard'
+    | '/pending'
+    | '/subjects'
+    | '/subjects/$subjectId'
   id:
     | '__root__'
     | '/'
@@ -91,6 +119,8 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/dashboard'
     | '/pending'
+    | '/subjects'
+    | '/subjects/$subjectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -100,10 +130,18 @@ export interface RootRouteChildren {
   CompleteProfileRoute: typeof CompleteProfileRoute
   DashboardRoute: typeof DashboardRoute
   PendingRoute: typeof PendingRoute
+  SubjectsRoute: typeof SubjectsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/subjects': {
+      id: '/subjects'
+      path: '/subjects'
+      fullPath: '/subjects'
+      preLoaderRoute: typeof SubjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pending': {
       id: '/pending'
       path: '/pending'
@@ -146,8 +184,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subjects/$subjectId': {
+      id: '/subjects/$subjectId'
+      path: '/$subjectId'
+      fullPath: '/subjects/$subjectId'
+      preLoaderRoute: typeof SubjectsSubjectIdRouteImport
+      parentRoute: typeof SubjectsRoute
+    }
   }
 }
+
+interface SubjectsRouteChildren {
+  SubjectsSubjectIdRoute: typeof SubjectsSubjectIdRoute
+}
+
+const SubjectsRouteChildren: SubjectsRouteChildren = {
+  SubjectsSubjectIdRoute: SubjectsSubjectIdRoute,
+}
+
+const SubjectsRouteWithChildren = SubjectsRoute._addFileChildren(
+  SubjectsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -156,6 +213,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompleteProfileRoute: CompleteProfileRoute,
   DashboardRoute: DashboardRoute,
   PendingRoute: PendingRoute,
+  SubjectsRoute: SubjectsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
