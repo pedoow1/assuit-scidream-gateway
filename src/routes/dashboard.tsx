@@ -29,14 +29,17 @@ function Dashboard() {
     if (loading) return;
 
     if (!user) {
-      // انتظر 500ms قبل الـ redirect عشان الـ session تتحمل صح
       const timer = setTimeout(() => navigate({ to: "/auth" }), 500);
       return () => clearTimeout(timer);
     }
 
     if (isOwnerAdmin) return;
 
-    if (!profile) return; // لسه بيتحمل
+    if (!profile) {
+      // لو الـ profile لسه null بعد 5 ثواني، روح لـ complete-profile
+      const timer = setTimeout(() => navigate({ to: "/complete-profile" }), 5000);
+      return () => clearTimeout(timer);
+    }
 
     if (profile.verification_status === "incomplete") {
       navigate({ to: "/complete-profile" });
@@ -99,7 +102,6 @@ function Dashboard() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-10">
-        {/* Welcome */}
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent">أهلاً بيك</div>
           <h1 className="mt-2 font-display text-3xl md:text-4xl">
@@ -110,7 +112,6 @@ function Dashboard() {
           </p>
         </div>
 
-        {/* Quick actions */}
         <div className="mt-8">
           <h2 className="font-display text-xl">الأقسام</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
