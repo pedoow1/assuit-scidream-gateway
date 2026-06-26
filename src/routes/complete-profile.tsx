@@ -13,7 +13,8 @@ export const Route = createFileRoute("/complete-profile")({
 });
 
 function CompleteProfilePage() {
-  const { user, profile, loading, refresh } = useAuth();
+  const { user, profile, roles, loading, refresh } = useAuth();
+  const isAdmin = roles.includes("admin") || roles.includes("super_admin");
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
