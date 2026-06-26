@@ -110,8 +110,7 @@ function VerificationTab() {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      // FIX 1: جيب pending و incomplete معاً
-      .in("verification_status", ["pending", "incomplete"])
+      .eq("verification_status", "pending")
       .order("updated_at", { ascending: false });
     if (error) toast.error("ما قدرناش نحمل القائمة");
     setPending((data ?? []) as ProfileRow[]);
@@ -127,7 +126,6 @@ function VerificationTab() {
     setPreview({ row, url: data.signedUrl });
   }
 
-  // FIX 2: بعد approve/reject نعمل load() من الـ DB بدل filter محلي
   async function approve(row: ProfileRow) {
     const { error } = await supabase
       .from("profiles")
@@ -135,7 +133,10 @@ function VerificationTab() {
       .eq("id", row.id);
     if (error) return toast.error("فشل التأكيد");
     toast.success(`تم تأكيد ${row.full_name} ✨`);
+    // optimistic remove أولاً عشان UI يتحدث فوراً
+    setPending((p) => p.filter((r) => r.id !== row.id));
     setPreview(null);
+    // بعدين load من DB عشان نتأكد
     await load();
   }
 
@@ -147,6 +148,7 @@ function VerificationTab() {
       .eq("id", row.id);
     if (error) return toast.error("فشل الرفض");
     toast.success("تم رفض الطلب");
+    setPending((p) => p.filter((r) => r.id !== row.id));
     setPreview(null);
     await load();
   }
@@ -177,7 +179,6 @@ function VerificationTab() {
                 <th className="px-4 py-3">التليفون</th>
                 <th className="px-4 py-3">الإيميل</th>
                 <th className="px-4 py-3">دفعة</th>
-                <th className="px-4 py-3">الحالة</th>
                 <th className="px-4 py-3 text-center">إجراءات</th>
               </tr>
             </thead>
@@ -189,15 +190,6 @@ function VerificationTab() {
                   <td className="px-4 py-3 font-mono text-xs">{row.phone}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{row.email}</td>
                   <td className="px-4 py-3 text-xs">{row.batch_year}</td>
-                  <td className="px-4 py-3 text-xs">
-                    <span className={`rounded-full px-2 py-0.5 ${
-                      row.verification_status === "pending"
-                        ? "bg-amber-500/15 text-amber-600"
-                        : "bg-secondary text-muted-foreground"
-                    }`}>
-                      {row.verification_status === "pending" ? "pending" : "incomplete"}
-                    </span>
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1.5">
                       <button onClick={() => showCard(row)} className="rounded-lg border border-border p-1.5 hover:border-accent" title="عرض البطاقة">
