@@ -49,7 +49,7 @@ function CompleteProfilePage() {
       toast.error("املأ كل البيانات الأول");
       return;
     }
-    if (!idFile && !profile?.id_card_url) {
+    if (!isAdmin && !idFile && !profile?.id_card_url) {
       toast.error("لازم ترفع صورة بطاقتك الجامعية");
       return;
     }
@@ -61,7 +61,7 @@ function CompleteProfilePage() {
       if (idFile) {
         const ext = idFile.name.split(".").pop() ?? "jpg";
         const path = `${user.id}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("id-cards").upload(path, idFile, { upsert: true });
+        const { error: upErr } = await supabase.storage.from("id-cards").upload(path, idFile, { upsert: true, contentType: idFile.type });
         if (upErr) throw upErr;
         idCardUrl = path;
       }
@@ -74,21 +74,23 @@ function CompleteProfilePage() {
           phone: phone.trim(),
           batch_year: Number(batchYear),
           id_card_url: idCardUrl,
-          verification_status: "pending",
+          // Admins auto-verify themselves; students go to pending review
+          verification_status: isAdmin ? "verified" : "pending",
+          is_verified: isAdmin ? true : undefined,
         })
         .eq("id", user.id);
 
       if (error) throw error;
       await refresh();
-      toast.success("تم إرسال بياناتك ✨");
-      navigate({ to: "/pending" });
+      toast.success(isAdmin ? "تم حفظ بياناتك ✨" : "تم إرسال بياناتك للمراجعة ✨");
+      navigate({ to: isAdmin ? "/dashboard" : "/pending" });
     } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : String(err);
+      console.error("[complete-profile] save failed", err);
+      const message = err instanceof Error ? err.message : (typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : String(err));
       if (message.toLowerCase().includes("duplicate")) {
         toast.error("الرقم الأكاديمي ده مستخدم قبل كده");
       } else {
-        toast.error("حصلت مشكلة في الحفظ — جرب تاني");
+        toast.error(`حصلت مشكلة في الحفظ: ${message}`);
       }
     } finally {
       setSubmitting(false);
