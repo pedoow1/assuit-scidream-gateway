@@ -1,0 +1,345 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2 } from "lucide-react";
+import { useAuth, isAdminRole, type ProfileRow } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { CosmicBackground } from "@/components/CosmicBackground";
+import { Logo } from "@/components/Logo";
+
+export const Route = createFileRoute("/admin")({
+  head: () => ({ meta: [{ title: "لوحة الأدمن — Dream Team" }] }),
+  component: AdminPage,
+});
+
+type Tab = "verification" | "admins";
+
+function AdminPage() {
+  const { user, roles, loading } = useAuth();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<Tab>("verification");
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) navigate({ to: "/auth" });
+    else if (!isAdminRole(roles)) navigate({ to: "/dashboard" });
+  }, [user, roles, loading, navigate]);
+
+  if (loading || !user || !isAdminRole(roles)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
+
+  const isSuper = roles.includes("super_admin");
+
+  return (
+    <div className="relative min-h-screen">
+      <CosmicBackground density={20} />
+
+      <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4 rotate-180" /> الرجوع
+          </Link>
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-5 w-5 text-accent" />
+            <div>
+              <div className="font-display text-base font-semibold leading-tight">لوحة الأدمن</div>
+              <div className="text-[10px] text-muted-foreground">
+                {isSuper ? "Super Admin · أنت الـ Big Boss" : "Admin"}
+              </div>
+            </div>
+            <Logo size={36} />
+          </div>
+        </div>
+      </header>
+
+      <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+        <div className="flex gap-2 border-b border-border">
+          <TabBtn active={tab === "verification"} onClick={() => setTab("verification")}>
+            مراجعة الطلاب
+          </TabBtn>
+          {isSuper && (
+            <TabBtn active={tab === "admins"} onClick={() => setTab("admins")}>
+              إدارة الأدمن
+            </TabBtn>
+          )}
+        </div>
+
+        <div className="mt-6">
+          {tab === "verification" && <VerificationTab />}
+          {tab === "admins" && isSuper && <AdminsTab />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative -mb-px px-4 py-2.5 text-sm font-medium transition ${
+        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+      {active && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-cosmic" />}
+    </button>
+  );
+}
+
+/* ---------------- Verification tab ---------------- */
+
+function VerificationTab() {
+  const [pending, setPending] = useState<ProfileRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<{ row: ProfileRow; url: string } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("verification_status", "pending")
+      .order("updated_at", { ascending: false });
+    if (error) toast.error("ما قدرناش نحمل القائمة");
+    setPending((data ?? []) as ProfileRow[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function showCard(row: ProfileRow) {
+    if (!row.id_card_url) { toast.error("لا توجد صورة"); return; }
+    const { data, error } = await supabase.storage.from("id-cards").createSignedUrl(row.id_card_url, 600);
+    if (error || !data) { toast.error("تعذر فتح الصورة"); return; }
+    setPreview({ row, url: data.signedUrl });
+  }
+
+  async function approve(row: ProfileRow) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ verification_status: "verified", is_verified: true, rejection_reason: null })
+      .eq("id", row.id);
+    if (error) return toast.error("فشل التأكيد");
+    toast.success(`تم تأكيد ${row.full_name} ✨`);
+    setPending((p) => p.filter((r) => r.id !== row.id));
+    setPreview(null);
+  }
+
+  async function reject(row: ProfileRow) {
+    const reason = prompt("سبب الرفض (اختياري):") ?? "";
+    const { error } = await supabase
+      .from("profiles")
+      .update({ verification_status: "rejected", is_verified: false, rejection_reason: reason || "بيانات غير صحيحة" })
+      .eq("id", row.id);
+    if (error) return toast.error("فشل الرفض");
+    toast.success("تم رفض الطلب");
+    setPending((p) => p.filter((r) => r.id !== row.id));
+    setPreview(null);
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>;
+  }
+
+  if (pending.length === 0) {
+    return (
+      <div className="cosmic-card rounded-2xl p-12 text-center">
+        <div className="text-5xl">✨</div>
+        <h3 className="mt-3 font-display text-xl">مفيش طلبات تستنى</h3>
+        <p className="mt-1 text-sm text-muted-foreground">كل الطلاب اتأكدوا — رايق</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="cosmic-card overflow-hidden rounded-2xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-sm">
+            <thead className="border-b border-border bg-secondary/30 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">الاسم</th>
+                <th className="px-4 py-3">الرقم الأكاديمي</th>
+                <th className="px-4 py-3">التليفون</th>
+                <th className="px-4 py-3">الإيميل</th>
+                <th className="px-4 py-3">دفعة</th>
+                <th className="px-4 py-3 text-center">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {pending.map((row) => (
+                <tr key={row.id} className="hover:bg-secondary/20">
+                  <td className="px-4 py-3 font-medium">{row.full_name}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{row.academic_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{row.phone}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{row.email}</td>
+                  <td className="px-4 py-3 text-xs">{row.batch_year}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button onClick={() => showCard(row)} className="rounded-lg border border-border p-1.5 hover:border-accent" title="عرض البطاقة">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => approve(row)} className="rounded-lg bg-green-600/15 p-1.5 text-green-700 hover:bg-green-600/25" title="تأكيد">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => reject(row)} className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25" title="رفض">
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
+          <div className="cosmic-card max-w-2xl rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="font-display text-lg">{preview.row.full_name}</div>
+                <div className="text-xs text-muted-foreground">{preview.row.academic_id}</div>
+              </div>
+              <button onClick={() => setPreview(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+            <img src={preview.url} alt="بطاقة جامعية" className="max-h-[60vh] w-full rounded-lg object-contain" />
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => approve(preview.row)} className="flex-1 rounded-full bg-green-600 py-2.5 text-sm font-semibold text-white">
+                تأكيد ✓
+              </button>
+              <button onClick={() => reject(preview.row)} className="flex-1 rounded-full bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground">
+                رفض ✗
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ---------------- Admins tab (super admin only) ---------------- */
+
+type AdminRow = { user_id: string; role: "admin" | "super_admin"; profile: ProfileRow | null };
+
+function AdminsTab() {
+  const [rows, setRows] = useState<AdminRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [emailInput, setEmailInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["admin", "super_admin"]);
+    if (!roleRows || roleRows.length === 0) { setRows([]); setLoading(false); return; }
+    const ids = roleRows.map((r) => r.user_id);
+    const { data: profs } = await supabase.from("profiles").select("*").in("id", ids);
+    const profMap = new Map((profs ?? []).map((p) => [p.id, p as ProfileRow]));
+    setRows(roleRows.map((r) => ({ user_id: r.user_id, role: r.role as "admin" | "super_admin", profile: profMap.get(r.user_id) ?? null })));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function grantAdmin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    setSubmitting(true);
+    const email = emailInput.trim().toLowerCase();
+    const { data: prof } = await supabase.from("profiles").select("id").eq("email", email).maybeSingle();
+    if (!prof) {
+      toast.error("لا يوجد مستخدم بهذا الإيميل — لازم يسجل دخول الأول");
+      setSubmitting(false);
+      return;
+    }
+    const { error } = await supabase.from("user_roles").insert({ user_id: prof.id, role: "admin" });
+    if (error) {
+      if (error.code === "23505") toast.info("ده أدمن أصلاً");
+      else toast.error("فشل التعيين");
+    } else {
+      toast.success("تم التعيين كأدمن ✨");
+      setEmailInput("");
+      load();
+    }
+    setSubmitting(false);
+  }
+
+  async function revoke(row: AdminRow) {
+    if (row.role === "super_admin") { toast.error("لا يمكن إزالة الـ Super Admin"); return; }
+    if (!confirm(`إزالة صلاحية الأدمن من ${row.profile?.full_name || row.profile?.email}؟`)) return;
+    const { error } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", row.user_id)
+      .eq("role", "admin");
+    if (error) toast.error("فشل الإزالة");
+    else { toast.success("تمت الإزالة"); load(); }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="cosmic-card rounded-2xl p-6">
+        <h3 className="font-display text-lg">تعيين أدمن جديد</h3>
+        <p className="mt-1 text-sm text-muted-foreground">المستخدم لازم يسجل دخول بحساب جوجل أولاً.</p>
+        <form onSubmit={grantAdmin} className="mt-4 flex gap-2">
+          <input
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            placeholder="email@example.com"
+            className="flex-1 rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm"
+            required
+          />
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            <UserPlus className="h-4 w-4" /> تعيين
+          </button>
+        </form>
+      </div>
+
+      <div className="cosmic-card overflow-hidden rounded-2xl">
+        <div className="border-b border-border bg-secondary/30 px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground">
+          الأدمن الحاليين
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-accent" /></div>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {rows.map((r) => (
+              <li key={r.user_id + r.role} className="flex items-center justify-between px-4 py-3 text-sm">
+                <div>
+                  <div className="font-medium">{r.profile?.full_name ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground">{r.profile?.email}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-0.5 text-xs ${r.role === "super_admin" ? "bg-gradient-cosmic text-primary-foreground" : "bg-secondary"}`}>
+                    {r.role === "super_admin" ? "Super Admin" : "Admin"}
+                  </span>
+                  {r.role === "admin" && (
+                    <button onClick={() => revoke(r)} className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25" title="إزالة">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
