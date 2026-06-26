@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut } from "lucide-react";
-import { useAuth, isAdminRole } from "@/lib/auth";
+import { useAuth, isAdminRole, type ProfileRow } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -21,44 +21,52 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
 ];
 
 function Dashboard() {
-  const { user, profile, roles, loading, refresh } = useAuth();
+  const { user, profile: authProfile, roles, loading } = useAuth();
   const navigate = useNavigate();
   const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
-  const [refreshing, setRefreshing] = useState(false);
-  const didRefresh = useRef(false);
 
-  // لما الداشبورد يفتح وفيه user بس profile null، اعمل refresh أولاً
-  useEffect(() => {
-    if (loading || !user || didRefresh.current || profile) return;
-    didRefresh.current = true;
-    setRefreshing(true);
-    refresh().finally(() => setRefreshing(false));
-  }, [loading, user, profile]);
+  // نجيب الـ profile مباشرة من DB عشان نضمن إنه fresh
+  const [profile, setProfile] = useState<ProfileRow | null>(authProfile);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    // استنى لو لسه بيعمل refresh
-    if (loading || refreshing) return;
-    if (!user) {
-      const timer = setTimeout(() => navigate({ to: "/auth" }), 500);
-      return () => clearTimeout(timer);
-    }
-    if (isOwnerAdmin) return;
-    if (!profile) {
-      // كل الـ refresh خلصت وبرضه profile null → incomplete
-      navigate({ to: "/complete-profile" });
+    if (loading || !user || isOwnerAdmin) return;
+
+    // لو الـ authProfile موجود وـverified، استخدمه على طول
+    if (authProfile?.verification_status === "verified") {
+      setProfile(authProfile);
       return;
     }
-    if (profile.verification_status === "incomplete") {
-      navigate({ to: "/complete-profile" });
-    } else if (
-      profile.verification_status === "pending" ||
-      profile.verification_status === "rejected"
-    ) {
-      navigate({ to: "/pending" });
-    }
-  }, [user, profile, loading, refreshing, navigate, isOwnerAdmin]);
 
-  if (loading || refreshing) {
+    // غير كده، اجيب من DB مباشرة
+    setChecking(true);
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (!data) {
+          navigate({ to: "/complete-profile" });
+          return;
+        }
+        const p = data as ProfileRow;
+        setProfile(p);
+        if (p.verification_status === "incomplete") {
+          navigate({ to: "/complete-profile" });
+        } else if (p.verification_status === "pending" || p.verification_status === "rejected") {
+          navigate({ to: "/pending" });
+        }
+      })
+      .finally(() => setChecking(false));
+  }, [loading, user, authProfile, isOwnerAdmin]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) navigate({ to: "/auth" });
+  }, [loading, user]);
+
+  if (loading || checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
