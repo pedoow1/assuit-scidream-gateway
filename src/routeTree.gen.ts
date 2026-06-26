@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as GpaRouteImport } from './routes/gpa'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -26,6 +27,11 @@ const SubjectsRoute = SubjectsRouteImport.update({
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GpaRoute = GpaRouteImport.update({
+  id: '/gpa',
+  path: '/gpa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
+  '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
   '/subjects/$subjectId': typeof SubjectsSubjectIdRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/complete-profile'
     | '/dashboard'
+    | '/gpa'
     | '/pending'
     | '/subjects'
     | '/subjects/$subjectId'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompleteProfileRoute: typeof CompleteProfileRoute
   DashboardRoute: typeof DashboardRoute
+  GpaRoute: typeof GpaRoute
   PendingRoute: typeof PendingRoute
   SubjectsRoute: typeof SubjectsRouteWithChildren
 }
@@ -147,6 +160,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gpa': {
+      id: '/gpa'
+      path: '/gpa'
+      fullPath: '/gpa'
+      preLoaderRoute: typeof GpaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -212,6 +232,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompleteProfileRoute: CompleteProfileRoute,
   DashboardRoute: DashboardRoute,
+  GpaRoute: GpaRoute,
   PendingRoute: PendingRoute,
   SubjectsRoute: SubjectsRouteWithChildren,
 }
