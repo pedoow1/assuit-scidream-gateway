@@ -14,18 +14,22 @@ export const Route = createFileRoute("/admin")({
 
 type Tab = "verification" | "admins";
 
+const OWNER_EMAIL = "abdalahkotp31@gmail.com";
+
 function AdminPage() {
   const { user, roles, loading } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("verification");
 
+  const isOwnerAdmin = user?.email?.trim().toLowerCase() === OWNER_EMAIL;
+
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/auth" });
-    else if (!isAdminRole(roles)) navigate({ to: "/dashboard" });
-  }, [user, roles, loading, navigate]);
+    else if (!isOwnerAdmin && !isAdminRole(roles)) navigate({ to: "/dashboard" });
+  }, [user, roles, loading, navigate, isOwnerAdmin]);
 
-  if (loading || !user || !isAdminRole(roles)) {
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -33,7 +37,9 @@ function AdminPage() {
     );
   }
 
-  const isSuper = roles.includes("super_admin");
+  if (!isOwnerAdmin && !isAdminRole(roles)) return null;
+
+  const isSuper = isOwnerAdmin || roles.includes("super_admin");
 
   return (
     <div className="relative min-h-screen">
@@ -354,7 +360,7 @@ function AdminsTab() {
         ) : (
           <ul className="divide-y divide-border/60">
             {filtered.map((u) => {
-              const isSuper = u.roles.includes("super_admin");
+              const isSuper = u.roles.includes("super_admin") || u.email?.trim().toLowerCase() === OWNER_EMAIL;
               const isAdm = u.roles.includes("admin");
               return (
                 <li key={u.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
