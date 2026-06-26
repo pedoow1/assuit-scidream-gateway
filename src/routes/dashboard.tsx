@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,9 +21,18 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
 ];
 
 function Dashboard() {
-  const { user, profile, roles, loading } = useAuth();
+  const { user, profile, roles, loading, refresh } = useAuth();
   const navigate = useNavigate();
   const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
+  const refreshedRef = useRef(false);
+
+  // لما الداشبورد يفتح للأول مرة، اعمل refresh للـ profile من DB
+  // عشان لو جاي من pending بعد تفعيل، يجيب البيانات الجديدة
+  useEffect(() => {
+    if (!user || refreshedRef.current) return;
+    refreshedRef.current = true;
+    refresh();
+  }, [user]);
 
   useEffect(() => {
     if (loading) return;
@@ -36,7 +45,6 @@ function Dashboard() {
     if (isOwnerAdmin) return;
 
     if (!profile) {
-      // لو الـ profile لسه null بعد 5 ثواني، روح لـ complete-profile
       const timer = setTimeout(() => navigate({ to: "/complete-profile" }), 5000);
       return () => clearTimeout(timer);
     }
