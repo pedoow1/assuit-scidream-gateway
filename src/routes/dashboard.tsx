@@ -27,16 +27,36 @@ function Dashboard() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) navigate({ to: "/auth" });
-    else if (isOwnerAdmin) return;
-    else if (!profile) navigate({ to: "/complete-profile" });
-    else if (profile.verification_status === "incomplete") navigate({ to: "/complete-profile" });
-    else if (profile.verification_status === "pending" || profile.verification_status === "rejected") {
+
+    if (!user) {
+      // انتظر 500ms قبل الـ redirect عشان الـ session تتحمل صح
+      const timer = setTimeout(() => navigate({ to: "/auth" }), 500);
+      return () => clearTimeout(timer);
+    }
+
+    if (isOwnerAdmin) return;
+
+    if (!profile) return; // لسه بيتحمل
+
+    if (profile.verification_status === "incomplete") {
+      navigate({ to: "/complete-profile" });
+    } else if (
+      profile.verification_status === "pending" ||
+      profile.verification_status === "rejected"
+    ) {
       navigate({ to: "/pending" });
     }
   }, [user, profile, loading, navigate, isOwnerAdmin]);
 
-  if (loading || !user || (!profile && !isOwnerAdmin)) {
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
+
+  if (!user || (!profile && !isOwnerAdmin)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
