@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2 } from "lucide-react";
-import { useAuth, isAdminRole, type ProfileRow } from "@/lib/auth";
+import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -229,28 +229,53 @@ function VerificationTab() {
 /* ---------------- Admins tab (super admin only) ---------------- */
 
 type AdminRow = { user_id: string; role: "admin" | "super_admin"; profile: ProfileRow | null };
+type UserRow = ProfileRow & { roles: AppRole[] };
 
 function AdminsTab() {
   const [rows, setRows] = useState<AdminRow[]>([]);
+  const [allUsers, setAllUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: roleRows } = await supabase
-      .from("user_roles")
-      .select("user_id, role")
-      .in("role", ["admin", "super_admin"]);
-    if (!roleRows || roleRows.length === 0) { setRows([]); setLoading(false); return; }
-    const ids = roleRows.map((r) => r.user_id);
-    const { data: profs } = await supabase.from("profiles").select("*").in("id", ids);
+    const [{ data: roleRows }, { data: profs }] = await Promise.all([
+      supabase.from("user_roles").select("user_id, role"),
+      supabase.from("profiles").select("*").order("updated_at", { ascending: false }),
+    ]);
+    const rolesByUser = new Map<string, AppRole[]>();
+    (roleRows ?? []).forEach((r) => {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role as AppRole);
+      rolesByUser.set(r.user_id, arr);
+    });
     const profMap = new Map((profs ?? []).map((p) => [p.id, p as ProfileRow]));
-    setRows(roleRows.map((r) => ({ user_id: r.user_id, role: r.role as "admin" | "super_admin", profile: profMap.get(r.user_id) ?? null })));
+    const admins: AdminRow[] = [];
+    (roleRows ?? []).forEach((r) => {
+      if (r.role === "admin" || r.role === "super_admin") {
+        admins.push({ user_id: r.user_id, role: r.role as "admin" | "super_admin", profile: profMap.get(r.user_id) ?? null });
+      }
+    });
+    const users: UserRow[] = (profs ?? []).map((p) => ({ ...(p as ProfileRow), roles: rolesByUser.get(p.id) ?? [] }));
+    setRows(admins);
+    setAllUsers(users);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function promoteById(userId: string) {
+    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
+    if (error) {
+      if (error.code === "23505") toast.info("ده أدمن أصلاً");
+      else toast.error("فشل التعيين");
+    } else {
+      toast.success("تم التعيين كأدمن ✨");
+      load();
+    }
+  }
 
   async function grantAdmin(e: React.FormEvent) {
     e.preventDefault();
@@ -263,15 +288,8 @@ function AdminsTab() {
       setSubmitting(false);
       return;
     }
-    const { error } = await supabase.from("user_roles").insert({ user_id: prof.id, role: "admin" });
-    if (error) {
-      if (error.code === "23505") toast.info("ده أدمن أصلاً");
-      else toast.error("فشل التعيين");
-    } else {
-      toast.success("تم التعيين كأدمن ✨");
-      setEmailInput("");
-      load();
-    }
+    await promoteById(prof.id);
+    setEmailInput("");
     setSubmitting(false);
   }
 
@@ -287,12 +305,22 @@ function AdminsTab() {
     else { toast.success("تمت الإزالة"); load(); }
   }
 
+  const filtered = allUsers.filter((u) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (u.email ?? "").toLowerCase().includes(q) ||
+      (u.full_name ?? "").toLowerCase().includes(q) ||
+      (u.academic_id ?? "").toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
       <div className="cosmic-card rounded-2xl p-6">
-        <h3 className="font-display text-lg">تعيين أدمن جديد</h3>
+        <h3 className="font-display text-lg">تعيين أدمن بالإيميل</h3>
         <p className="mt-1 text-sm text-muted-foreground">المستخدم لازم يسجل دخول بحساب جوجل أولاً.</p>
-        <form onSubmit={grantAdmin} className="mt-4 flex gap-2">
+        <form onSubmit={grantAdmin} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input
             type="email"
             value={emailInput}
@@ -304,7 +332,7 @@ function AdminsTab() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             <UserPlus className="h-4 w-4" /> تعيين
           </button>
@@ -312,31 +340,62 @@ function AdminsTab() {
       </div>
 
       <div className="cosmic-card overflow-hidden rounded-2xl">
-        <div className="border-b border-border bg-secondary/30 px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground">
-          الأدمن الحاليين
+        <div className="flex flex-col gap-2 border-b border-border bg-secondary/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">كل المستخدمين ({allUsers.length})</div>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ابحث بالاسم أو الإيميل…"
+            className="rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs"
+          />
         </div>
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-accent" /></div>
         ) : (
           <ul className="divide-y divide-border/60">
-            {rows.map((r) => (
-              <li key={r.user_id + r.role} className="flex items-center justify-between px-4 py-3 text-sm">
-                <div>
-                  <div className="font-medium">{r.profile?.full_name ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">{r.profile?.email}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-3 py-0.5 text-xs ${r.role === "super_admin" ? "bg-gradient-cosmic text-primary-foreground" : "bg-secondary"}`}>
-                    {r.role === "super_admin" ? "Super Admin" : "Admin"}
-                  </span>
-                  {r.role === "admin" && (
-                    <button onClick={() => revoke(r)} className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25" title="إزالة">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+            {filtered.map((u) => {
+              const isSuper = u.roles.includes("super_admin");
+              const isAdm = u.roles.includes("admin");
+              return (
+                <li key={u.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{u.full_name ?? "—"}</div>
+                    <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                      {u.verification_status}
+                    </span>
+                    {isSuper && (
+                      <span className="rounded-full bg-gradient-cosmic px-3 py-0.5 text-xs text-primary-foreground">Super Admin</span>
+                    )}
+                    {isAdm && !isSuper && (
+                      <>
+                        <span className="rounded-full bg-secondary px-3 py-0.5 text-xs">Admin</span>
+                        <button
+                          onClick={() => revoke({ user_id: u.id, role: "admin", profile: u })}
+                          className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25"
+                          title="إزالة"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                    {!isSuper && !isAdm && (
+                      <button
+                        onClick={() => promoteById(u.id)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> تعيين أدمن
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+            {filtered.length === 0 && (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">لا يوجد مستخدمين مطابقين</li>
+            )}
           </ul>
         )}
       </div>
