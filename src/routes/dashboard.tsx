@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut } from "lucide-react";
-import { useAuth, isAdminRole, type ProfileRow } from "@/lib/auth";
+import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut, MapPin, FlaskConical, LayoutGrid } from "lucide-react";
+import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -20,61 +20,71 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
   { icon: Bell, label: "الإعلانات", color: "from-cosmic/40 to-gold/40" },
 ];
 
+const AUDITORIUMS = [
+  { id: "مدرج 1", location: "الدور الثاني بين رياضيات ونبات" },
+  { id: "مدرج 2", location: "الدور الثاني بين نبات وحيوان" },
+  { id: "مدرج 3", location: "الدور الأرضي بين رياضيات ونبات" },
+  { id: "مدرج 4", location: "الدور الأرضي بين نبات وحيوان" },
+  { id: "مدرج 5", location: "الدور الثاني بين جيولوجيا وفيزياء" },
+  { id: "مدرج 6", location: "الدور الثاني بين فيزياء وكيمياء" },
+  { id: "مدرج 7", location: "الدور الأرضي بين جيولوجيا وفيزياء" },
+  { id: "مدرج 8", location: "الدور الأرضي بين فيزياء وكيمياء" },
+  { id: "مدرج 9", location: "الدور الثاني بين رياضيات ونبات" },
+  { id: "مدرج 10", location: "الدور الثاني بين جيولوجيا وفيزياء" },
+  { id: "مدرج 11", location: "الدور الثاني بين رياضيات ونبات" },
+  { id: "مدرج 12", location: "الدور الثاني بين رياضيات ونبات" },
+  { id: "مدرج B – A", location: "في قسم الكيمياء الجديد (كيمياء ب)" },
+];
+
+const CLASSROOMS = [
+  { id: "فصل 1 - 2", location: "الدور الثاني بين حيوان ونبات" },
+  { id: "فصل 3 - 4", location: "الدور الثالث بين رياضيات ونبات" },
+  { id: "فصل 5 - 6", location: "الدور الثالث بين حيوان ونبات" },
+];
+
+const LABS = [
+  { id: "معمل كيمياء الفرقة الأولى", location: "الدور الأرضي — قسم كيمياء" },
+  { id: "معمل نبات 1 , 2 , 3", location: "الدور الثاني — قسم نبات" },
+  { id: "معمل نبات 5", location: "الدور الرابع — قسم نبات" },
+  { id: "معمل حيوان 1 , 2", location: "الدور الثاني — قسم حيوان" },
+  { id: "معمل حيوان 3 , 4", location: "الدور الثالث — قسم حيوان" },
+  { id: "معمل جيولوجيا 1 , 2", location: "الدور الأرضي — قسم جيولوجيا" },
+  { id: "معمل جيولوجيا 3 , 4", location: "الدور الثاني — قسم جيولوجيا" },
+  { id: "معمل الفيزياء للفرقة الأولى", location: "الدور الثاني — قسم فيزياء" },
+  { id: "معمل الحاسب", location: "الدور الأرضي — قسم رياضيات" },
+];
+
+const LOCATION_TABS = [
+  { key: "auditoriums", label: "المدرجات", icon: LayoutGrid },
+  { key: "classrooms", label: "الفصول", icon: BookOpen },
+  { key: "labs", label: "المعامل", icon: FlaskConical },
+] as const;
+
 function Dashboard() {
-  const { user, profile: authProfile, roles, loading } = useAuth();
+  const { user, profile, roles, loading } = useAuth();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"auditoriums" | "classrooms" | "labs">("auditoriums");
   const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
-
-  // نجيب الـ profile مباشرة من DB عشان نضمن إنه fresh
-  const [profile, setProfile] = useState<ProfileRow | null>(authProfile);
-  const [checking, setChecking] = useState(false);
-
-  useEffect(() => {
-    if (loading || !user || isOwnerAdmin) return;
-
-    // لو الـ authProfile موجود وـverified، استخدمه على طول
-    if (authProfile?.verification_status === "verified") {
-      setProfile(authProfile);
-      return;
-    }
-
-    // غير كده، اجيب من DB مباشرة
-    setChecking(true);
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (!data) {
-          navigate({ to: "/complete-profile" });
-          return;
-        }
-        const p = data as ProfileRow;
-        setProfile(p);
-        if (p.verification_status === "incomplete") {
-          navigate({ to: "/complete-profile" });
-        } else if (p.verification_status === "pending" || p.verification_status === "rejected") {
-          navigate({ to: "/pending" });
-        }
-      })
-      .finally(() => setChecking(false));
-  }, [loading, user, authProfile, isOwnerAdmin]);
 
   useEffect(() => {
     if (loading) return;
-    if (!user) navigate({ to: "/auth" });
-  }, [loading, user]);
+    if (!user) {
+      const timer = setTimeout(() => navigate({ to: "/auth" }), 500);
+      return () => clearTimeout(timer);
+    }
+    if (isOwnerAdmin) return;
+    if (!profile) {
+      const timer = setTimeout(() => navigate({ to: "/complete-profile" }), 5000);
+      return () => clearTimeout(timer);
+    }
+    if (profile.verification_status === "incomplete") {
+      navigate({ to: "/complete-profile" });
+    } else if (profile.verification_status === "pending" || profile.verification_status === "rejected") {
+      navigate({ to: "/pending" });
+    }
+  }, [user, profile, loading, navigate, isOwnerAdmin]);
 
-  if (loading || checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
-      </div>
-    );
-  }
-
-  if (!user || (!profile && !isOwnerAdmin)) {
+  if (loading || (!user) || (!profile && !isOwnerAdmin)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -84,8 +94,13 @@ function Dashboard() {
 
   const isAdmin = isOwnerAdmin || isAdminRole(roles);
 
+  const currentData =
+    activeTab === "auditoriums" ? AUDITORIUMS :
+    activeTab === "classrooms" ? CLASSROOMS :
+    LABS;
+
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen" dir="rtl">
       <CosmicBackground density={26} />
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
@@ -116,7 +131,9 @@ function Dashboard() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-10">
+      <main className="relative z-10 mx-auto max-w-7xl px-6 py-10 space-y-8">
+
+        {/* Welcome */}
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent">أهلاً بيك</div>
           <h1 className="mt-2 font-display text-3xl md:text-4xl">
@@ -127,9 +144,10 @@ function Dashboard() {
           </p>
         </div>
 
-        <div className="mt-8">
-          <h2 className="font-display text-xl">الأقسام</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {/* Quick Access */}
+        <div>
+          <h2 className="font-display text-xl mb-4">الأقسام</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {QUICK.map((q) => {
               const inner = (
                 <>
@@ -149,10 +167,59 @@ function Dashboard() {
               );
             })}
           </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          <p className="mt-4 text-center text-xs text-muted-foreground">
             ✨ باقي الأقسام بتيتم تجهيزها — المواد جاهزة دلوقتي.
           </p>
         </div>
+
+        {/* Locations */}
+        <div className="cosmic-card rounded-3xl p-6 md:p-8">
+          <div className="mb-5 flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-accent" />
+            <h2 className="font-display text-xl">أماكن المدرجات والفصول والمعامل</h2>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {LOCATION_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  activeTab === tab.key
+                    ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
+                    : "border border-border bg-background/40 text-muted-foreground hover:border-accent"
+                }`}
+              >
+                <tab.icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto rounded-2xl border border-border/60">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-card/60 text-muted-foreground text-xs uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right font-semibold">
+                    {activeTab === "auditoriums" ? "المدرج" : activeTab === "classrooms" ? "الفصل" : "المعمل"}
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">الموقع</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {currentData.map((row) => (
+                  <tr key={row.id} className="hover:bg-card/40 transition">
+                    <td className="px-4 py-3 font-semibold text-accent">{row.id}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.location}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </main>
     </div>
   );
