@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,31 +24,30 @@ function Dashboard() {
   const { user, profile, roles, loading, refresh } = useAuth();
   const navigate = useNavigate();
   const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
-  const refreshedRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const didRefresh = useRef(false);
 
-  // لما الداشبورد يفتح للأول مرة، اعمل refresh للـ profile من DB
-  // عشان لو جاي من pending بعد تفعيل، يجيب البيانات الجديدة
+  // لما الداشبورد يفتح وفيه user بس profile null، اعمل refresh أولاً
   useEffect(() => {
-    if (!user || refreshedRef.current) return;
-    refreshedRef.current = true;
-    refresh();
-  }, [user]);
+    if (loading || !user || didRefresh.current || profile) return;
+    didRefresh.current = true;
+    setRefreshing(true);
+    refresh().finally(() => setRefreshing(false));
+  }, [loading, user, profile]);
 
   useEffect(() => {
-    if (loading) return;
-
+    // استنى لو لسه بيعمل refresh
+    if (loading || refreshing) return;
     if (!user) {
       const timer = setTimeout(() => navigate({ to: "/auth" }), 500);
       return () => clearTimeout(timer);
     }
-
     if (isOwnerAdmin) return;
-
     if (!profile) {
-      const timer = setTimeout(() => navigate({ to: "/complete-profile" }), 5000);
-      return () => clearTimeout(timer);
+      // كل الـ refresh خلصت وبرضه profile null → incomplete
+      navigate({ to: "/complete-profile" });
+      return;
     }
-
     if (profile.verification_status === "incomplete") {
       navigate({ to: "/complete-profile" });
     } else if (
@@ -57,9 +56,9 @@ function Dashboard() {
     ) {
       navigate({ to: "/pending" });
     }
-  }, [user, profile, loading, navigate, isOwnerAdmin]);
+  }, [user, profile, loading, refreshing, navigate, isOwnerAdmin]);
 
-  if (loading) {
+  if (loading || refreshing) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
