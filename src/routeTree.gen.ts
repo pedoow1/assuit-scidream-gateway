@@ -18,6 +18,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsSubjectIdRouteImport } from './routes/subjects.$subjectId'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as SubjectsSubjectIdQuizzesIndexRouteImport } from './routes/subjects.$subjectId.quizzes.index'
 import { Route as SubjectsSubjectIdQuizzesQuizIdRouteImport } from './routes/subjects.$subjectId.quizzes.$quizId'
 
@@ -66,6 +67,11 @@ const SubjectsSubjectIdRoute = SubjectsSubjectIdRouteImport.update({
   path: '/$subjectId',
   getParentRoute: () => SubjectsRoute,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
 const SubjectsSubjectIdQuizzesIndexRoute =
   SubjectsSubjectIdQuizzesIndexRouteImport.update({
     id: '/quizzes/',
@@ -82,12 +88,13 @@ const SubjectsSubjectIdQuizzesQuizIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
   '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
@@ -95,12 +102,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
   '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes': typeof SubjectsSubjectIdQuizzesIndexRoute
@@ -109,12 +117,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/complete-profile': typeof CompleteProfileRoute
   '/dashboard': typeof DashboardRoute
   '/gpa': typeof GpaRoute
   '/pending': typeof PendingRoute
   '/subjects': typeof SubjectsRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/subjects/$subjectId': typeof SubjectsSubjectIdRouteWithChildren
   '/subjects/$subjectId/quizzes/$quizId': typeof SubjectsSubjectIdQuizzesQuizIdRoute
   '/subjects/$subjectId/quizzes/': typeof SubjectsSubjectIdQuizzesIndexRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/gpa'
     | '/pending'
     | '/subjects'
+    | '/auth/callback'
     | '/subjects/$subjectId'
     | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes/'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/gpa'
     | '/pending'
     | '/subjects'
+    | '/auth/callback'
     | '/subjects/$subjectId'
     | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/gpa'
     | '/pending'
     | '/subjects'
+    | '/auth/callback'
     | '/subjects/$subjectId'
     | '/subjects/$subjectId/quizzes/$quizId'
     | '/subjects/$subjectId/quizzes/'
@@ -164,7 +176,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   CompleteProfileRoute: typeof CompleteProfileRoute
   DashboardRoute: typeof DashboardRoute
   GpaRoute: typeof GpaRoute
@@ -237,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsSubjectIdRouteImport
       parentRoute: typeof SubjectsRoute
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/subjects/$subjectId/quizzes/': {
       id: '/subjects/$subjectId/quizzes/'
       path: '/quizzes'
@@ -253,6 +272,16 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface SubjectsSubjectIdRouteChildren {
   SubjectsSubjectIdQuizzesQuizIdRoute: typeof SubjectsSubjectIdQuizzesQuizIdRoute
@@ -282,7 +311,7 @@ const SubjectsRouteWithChildren = SubjectsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   CompleteProfileRoute: CompleteProfileRoute,
   DashboardRoute: DashboardRoute,
   GpaRoute: GpaRoute,
