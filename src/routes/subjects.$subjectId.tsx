@@ -43,8 +43,9 @@ function SubjectDetailPage() {
 
   useEffect(() => {
     if (loading) return;
+    if (!profile) return;
     if (!user) navigate({ to: "/auth" });
-    else if (profile && profile.verification_status !== "verified" && !isAdmin) navigate({ to: "/pending" });
+    else if (profile.verification_status !== "verified" && !isAdmin) navigate({ to: "/pending" });
   }, [user, profile, loading, isAdmin, navigate]);
 
   const { data: subject } = useQuery({
