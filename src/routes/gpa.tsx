@@ -14,43 +14,41 @@ export const Route = createFileRoute("/gpa")({
   component: GpaPage,
 });
 
-// Egyptian / standard 4.0 scale
-const GRADES: { label: string; value: number }[] = [
-  { label: "A+ (4.0)", value: 4.0 },
-  { label: "A  (4.0)", value: 4.0 },
-  { label: "A- (3.7)", value: 3.7 },
-  { label: "B+ (3.3)", value: 3.3 },
-  { label: "B  (3.0)", value: 3.0 },
-  { label: "B- (2.7)", value: 2.7 },
-  { label: "C+ (2.3)", value: 2.3 },
-  { label: "C  (2.0)", value: 2.0 },
-  { label: "C- (1.7)", value: 1.7 },
-  { label: "D+ (1.3)", value: 1.3 },
-  { label: "D  (1.0)", value: 1.0 },
-  { label: "F  (0.0)", value: 0.0 },
+// النظام المصري الصح — بدون A+
+const GRADES: { label: string; ar: string; value: number }[] = [
+  { label: "A  (4.0)",  ar: "ممتاز",    value: 4.0 },
+  { label: "A- (3.7)",  ar: "ممتاز",    value: 3.7 },
+  { label: "B+ (3.3)",  ar: "جيد جداً", value: 3.3 },
+  { label: "B  (3.0)",  ar: "جيد جداً", value: 3.0 },
+  { label: "B- (2.7)",  ar: "جيد",      value: 2.7 },
+  { label: "C+ (2.3)",  ar: "جيد",      value: 2.3 },
+  { label: "C  (2.0)",  ar: "مقبول",    value: 2.0 },
+  { label: "C- (1.7)",  ar: "مقبول",    value: 1.7 },
+  { label: "D+ (1.3)",  ar: "مقبول",    value: 1.3 },
+  { label: "D  (1.0)",  ar: "مقبول",    value: 1.0 },
+  { label: "F  (0.0)",  ar: "راسب",     value: 0.0 },
 ];
 
-interface Course {
-  id: string;
-  name: string;
-  credits: number;
-  grade: number;
+function gradeLabel(gpa: number): string {
+  if (gpa >= 4.0) return "A";
+  if (gpa >= 3.7) return "A-";
+  if (gpa >= 3.3) return "B+";
+  if (gpa >= 3.0) return "B";
+  if (gpa >= 2.7) return "B-";
+  if (gpa >= 2.3) return "C+";
+  if (gpa >= 2.0) return "C";
+  if (gpa >= 1.7) return "C-";
+  if (gpa >= 1.3) return "D+";
+  if (gpa >= 1.0) return "D";
+  return "F";
 }
 
-interface Term {
-  id: string;
-  name: string;
-  courses: Course[];
-}
+interface Course { id: string; name: string; credits: number; grade: number; }
+interface Term   { id: string; name: string; courses: Course[]; }
 
 const rid = () => Math.random().toString(36).slice(2, 9);
-
-function newCourse(): Course {
-  return { id: rid(), name: "", credits: 3, grade: 4.0 };
-}
-function newTerm(name: string): Term {
-  return { id: rid(), name, courses: [newCourse()] };
-}
+function newCourse(): Course { return { id: rid(), name: "", credits: 3, grade: 4.0 }; }
+function newTerm(name: string): Term { return { id: rid(), name, courses: [newCourse()] }; }
 
 function gpaOf(courses: Course[]) {
   const valid = courses.filter((c) => c.credits > 0);
@@ -93,6 +91,8 @@ function GpaPage() {
     setTerms((ts) => (ts.length === 1 ? ts : ts.filter((t) => t.id !== id)));
   }
 
+  const letter = gradeLabel(cumulative.gpa);
+
   return (
     <div className="relative min-h-screen">
       <CosmicBackground density={22} />
@@ -119,7 +119,12 @@ function GpaPage() {
               <h1 className="mt-2 font-display text-3xl md:text-4xl">المعدل التراكمي</h1>
             </div>
             <div className="text-right">
-              <div className="text-4xl font-bold text-gradient-cosmic md:text-5xl">{cumulative.gpa.toFixed(2)}</div>
+              <div className="flex items-end gap-3 justify-end">
+                <div className="text-4xl font-bold text-gradient-cosmic md:text-5xl">{cumulative.gpa.toFixed(2)}</div>
+                <div className="mb-1 rounded-xl bg-gradient-cosmic px-3 py-1 text-lg font-bold text-primary-foreground">
+                  {letter}
+                </div>
+              </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {cumulative.credits} ساعة · {cumulative.points.toFixed(1)} نقطة
               </div>
@@ -142,7 +147,8 @@ function GpaPage() {
                     <div className="text-sm">
                       <span className="text-muted-foreground">GPA الفصل: </span>
                       <span className="font-bold text-foreground">{gpa.toFixed(2)}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">({credits} ساعة)</span>
+                      <span className="mx-1 font-semibold text-accent">{gradeLabel(gpa)}</span>
+                      <span className="text-xs text-muted-foreground">({credits} ساعة)</span>
                     </div>
                     {terms.length > 1 && (
                       <button
