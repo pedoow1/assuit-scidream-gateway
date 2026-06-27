@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Loader2, ArrowLeft, FolderPlus, Folder, FileText, Youtube, Link as LinkIcon,
-  Plus, ChevronLeft, X, Trash2, Upload, Download,
+  Plus, ChevronLeft, X, Trash2, Upload, Download, HardDriveDownload,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
@@ -39,6 +39,7 @@ function SubjectDetailPage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [showAddContent, setShowAddContent] = useState(false);
+  const [showImportDrive, setShowImportDrive] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -188,6 +189,11 @@ function SubjectDetailPage() {
                     <Plus className="h-3.5 w-3.5" /> محتوى جديد
                   </button>
                 )}
+                {currentFolderId && (
+                  <button onClick={() => setShowImportDrive(true)} className="inline-flex items-center gap-1.5 rounded-full border border-green-500/50 bg-green-500/10 px-4 py-1.5 text-xs font-semibold text-green-400 hover:bg-green-500/20">
+                    <HardDriveDownload className="h-3.5 w-3.5" /> استيراد من Drive
+                  </button>
+                )}
               </div>
             )}
 
@@ -255,6 +261,13 @@ function SubjectDetailPage() {
           onDone={() => { qc.invalidateQueries({ queryKey: ["content", subjectId, currentFolderId] }); setShowAddContent(false); }}
         />
       )}
+      {showImportDrive && currentFolderId && (
+        <ImportDriveModal
+          folderId={currentFolderId}
+          onClose={() => setShowImportDrive(false)}
+          onDone={() => { qc.invalidateQueries({ queryKey: ["content", subjectId, currentFolderId] }); setShowImportDrive(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -307,13 +320,30 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
   return (
     <div className="cosmic-card flex items-center justify-between gap-3 rounded-2xl p-4">
       <a href={item.external_url ?? "#"} target="_blank" rel="noreferrer" className="flex flex-1 items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/20 text-gold"><LinkIcon className="h-5 w-5" /></div>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          item.external_url?.includes("drive.google.com")
+            ? "bg-rose/20 text-rose"
+            : "bg-gold/20 text-gold"
+        }`}>
+          {item.external_url?.includes("drive.google.com")
+            ? <FileText className="h-5 w-5" />
+            : <LinkIcon className="h-5 w-5" />
+          }
+        </div>
         <div>
           <div className="font-medium">{item.title}</div>
           {item.description && <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>}
+          {item.external_url?.includes("drive.google.com") && (
+            <span className="mt-1 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] text-green-400">Google Drive PDF</span>
+          )}
         </div>
       </a>
-      {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+      <div className="flex items-center gap-1">
+        <a href={item.external_url ?? "#"} target="_blank" rel="noreferrer" className="rounded-full p-2 text-muted-foreground hover:bg-secondary">
+          <Download className="h-4 w-4" />
+        </a>
+        {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+      </div>
     </div>
   );
 }
@@ -433,6 +463,183 @@ function ModalShell({ title, children, onClose }: { title: string; children: Rea
         {children}
         <style>{`.modal-input { width: 100%; background: color-mix(in oklch, var(--background) 60%, transparent); border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.55rem 0.75rem; font-size: 0.9rem; outline: none; font-family: inherit; }
         .modal-input:focus { border-color: var(--accent); }`}</style>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Google Drive import helpers ---- */
+
+function extractDriveFolderId(input: string): string | null {
+  // Full URL: https://drive.google.com/drive/folders/FOLDER_ID
+  const urlMatch = input.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch) return urlMatch[1];
+  // Raw ID (no slashes)
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+function driveFileViewUrl(fileId: string): string {
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
+
+interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+}
+
+async function listDriveFiles(folderId: string): Promise<DriveFile[]> {
+  // Using Google Drive public JSON feed (works for publicly shared folders)
+  const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)&key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("تأكد إن الفولدر مشارك بشكل عام (Anyone with the link)");
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message ?? "خطأ في Google Drive API");
+  return (data.files ?? []) as DriveFile[];
+}
+
+function ImportDriveModal({ folderId, onClose, onDone }: { folderId: string; onClose: () => void; onDone: () => void }) {
+  const [driveInput, setDriveInput] = useState("");
+  const [files, setFiles] = useState<DriveFile[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  async function fetchFiles() {
+    const id = extractDriveFolderId(driveInput);
+    if (!id) return toast.error("رابط أو ID الفولدر غلط");
+    setLoading(true);
+    setFetched(false);
+    setFiles([]);
+    setSelected(new Set());
+    try {
+      const result = await listDriveFiles(id);
+      if (result.length === 0) {
+        toast.info("الفولدر فاضي أو مش مشارك");
+      } else {
+        setFiles(result);
+        // pre-select PDFs by default
+        setSelected(new Set(result.filter(f => f.mimeType === "application/pdf").map(f => f.id)));
+      }
+      setFetched(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "فشل تحميل الملفات");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleFile(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === files.length) setSelected(new Set());
+    else setSelected(new Set(files.map(f => f.id)));
+  }
+
+  async function doImport() {
+    const toImport = files.filter(f => selected.has(f.id));
+    if (toImport.length === 0) return toast.error("اختر ملف واحد على الأقل");
+    setImporting(true);
+    let ok = 0;
+    for (const f of toImport) {
+      const isPdf = f.mimeType === "application/pdf";
+      const payload = {
+        folder_id: folderId,
+        type: isPdf ? "link" : "link",
+        title: f.name.replace(/\.[^.]+$/, ""), // remove extension
+        description: null,
+        external_url: driveFileViewUrl(f.id),
+        file_url: null,
+        youtube_id: null,
+      };
+      const { error } = await supabase.from("content_items").insert(payload as never);
+      if (!error) ok++;
+      else toast.error(`فشل: ${f.name}`);
+    }
+    setImporting(false);
+    if (ok > 0) {
+      toast.success(`تم استيراد ${ok} ملف ✨`);
+      onDone();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="cosmic-card w-full max-w-lg rounded-2xl bg-card p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-xl flex items-center gap-2">
+            <HardDriveDownload className="h-5 w-5 text-green-400" /> استيراد من Google Drive
+          </h2>
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-secondary"><X className="h-4 w-4" /></button>
+        </div>
+
+        <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
+          حط رابط فولدر Google Drive أو الـ ID بتاعه. لازم الفولدر يكون مشارك على "Anyone with the link can view".
+        </p>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm"
+            placeholder="https://drive.google.com/drive/folders/..."
+            value={driveInput}
+            onChange={e => setDriveInput(e.target.value)}
+          />
+          <button
+            onClick={fetchFiles}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "جلب"}
+          </button>
+        </div>
+
+        {fetched && files.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{files.length} ملف — اختار اللي تحبه</span>
+              <button onClick={toggleAll} className="hover:text-foreground underline">
+                {selected.size === files.length ? "إلغاء الكل" : "تحديد الكل"}
+              </button>
+            </div>
+            <ul className="max-h-56 overflow-y-auto space-y-1.5 rounded-xl border border-border p-2">
+              {files.map(f => {
+                const isPdf = f.mimeType === "application/pdf";
+                return (
+                  <li
+                    key={f.id}
+                    onClick={() => toggleFile(f.id)}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                      selected.has(f.id) ? "bg-green-500/15 text-green-300" : "hover:bg-secondary/50"
+                    }`}
+                  >
+                    <span className="text-base">{isPdf ? "📄" : "📁"}</span>
+                    <span className="flex-1 truncate">{f.name}</span>
+                    {selected.has(f.id) && <span className="text-green-400 text-xs">✓</span>}
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              onClick={doImport}
+              disabled={importing || selected.size === 0}
+              className="mt-3 w-full rounded-full bg-green-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {importing ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> جاري الاستيراد...</span> : `استيراد ${selected.size} ملف`}
+            </button>
+          </div>
+        )}
+
+        {fetched && files.length === 0 && (
+          <p className="mt-4 text-center text-sm text-muted-foreground">مفيش ملفات في الفولدر ده.</p>
+        )}
       </div>
     </div>
   );
