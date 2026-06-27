@@ -97,7 +97,7 @@ function LandingPage() {
             كلية العلوم <span className="text-gradient-cosmic">جامعة أسيوط</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-            صدر القرار الوزاري رقم 1375 بتاريخ 13/7/2008م بإصدار اللائحة الداخلية للكلية بنظام الساعات المعتمدة.
+            تأسست في <span className="font-semibold text-foreground">أكتوبر 1957</span> — من أعرق كليات العلوم في صعيد مصر.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
