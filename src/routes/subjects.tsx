@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -158,6 +158,7 @@ function SubjectsPage() {
           onCreated={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setShowCreate(false); }}
         />
       )}
+      <Outlet />
     </div>
   );
 }
