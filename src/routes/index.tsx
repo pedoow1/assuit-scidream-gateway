@@ -371,18 +371,68 @@ function LandingPage() {
               </motion.div>
             ))}
           </div>
+
+          {/* شكر قيادة الكلية */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="cosmic-card rounded-2xl p-5 mt-5 text-center"
+          >
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              نتقدم بخالص الشكر والتقدير لقيادة كلية العلوم على دعمهم المستمر للأنشطة الطلابية وحرصهم على توفير بيئة أكاديمية محفزة تُنمي مهارات الطلاب وتدعم إبداعهم.
+            </p>
+          </motion.div>
         </div>
 
         {/* Dream Team */}
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">فريق Dream Team</div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              {
+                name: "خالد عماد",
+                role: "رئيس أسرة Dream Team",
+                bio: "يقود فريق العمل ويضطلع بمسؤولية التخطيط والتنظيم والإشراف على تنفيذ الأنشطة والفعاليات، مع الحرص الدائم على تحقيق أهداف الأسرة وخدمة طلاب كلية العلوم. يعمل على تعزيز روح التعاون بين أعضاء الفريق، وتبني الأفكار الإبداعية، وتمثيل الأسرة بصورة مشرفة داخل الكلية — إيمانًا بأن النجاح الحقيقي يبدأ بفريق متماسك ورؤية واضحة.",
+                img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0026.jpg",
+              },
+              {
+                name: "عبد الله قطب",
+                role: "مصمم الموقع ومسؤول السوشيال ميديا",
+                bio: "يتولى تصميم وتطوير الهوية الرقمية للأسرة، من بناء الموقع الإلكتروني وإدارة منظومته التقنية، إلى صياغة المحتوى الرقمي وإدارة حسابات التواصل الاجتماعي. يعمل على إيصال رسالة الأسرة بأسلوب احترافي وجذاب، ويسعى إلى تقديم تجربة رقمية متميزة تعكس قيم Dream Team وطموحاتها.",
+                img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6193778187.png",
+              },
+            ].map((p) => (
+              <motion.div
+                key={p.name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="cosmic-card rounded-2xl p-5 flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  <img
+                    src={p.img}
+                    alt={p.name}
+                    className="h-16 w-16 rounded-full object-cover object-top border-2 border-border shrink-0"
+                  />
+                  <div>
+                    <div className="font-semibold">{p.name}</div>
+                    <div className="mt-0.5 text-sm text-accent font-medium">{p.role}</div>
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">{p.bio}</p>
+              </motion.div>
+            ))}
+          </div>
+
           {/* نبذة عن الأسرة */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="cosmic-card rounded-2xl p-6 mb-6 text-center"
+            className="cosmic-card rounded-2xl p-6 mt-6 text-center"
           >
             <h3 className="font-display text-xl mb-3">Dream Team – كلية العلوم</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -394,31 +444,6 @@ function LandingPage() {
               لأننا نؤمن أن كل طالب يملك القدرة على تحقيق طموحه وترك بصمة حقيقية داخل الكلية وخارجها.
             </p>
           </motion.div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { name: "عبد الله قطب", role: "مسؤول السوشيال ميديا", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6193778187.png" },
-              { name: "خالد عماد", role: "مقرر الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0026.jpg" },
-            ].map((p) => (
-              <motion.div
-                key={p.name}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="cosmic-card rounded-2xl p-5 flex items-center gap-4"
-              >
-                <img
-                  src={p.img}
-                  alt={p.name}
-                  className="h-16 w-16 rounded-full object-cover object-top border-2 border-border shrink-0"
-                />
-                <div>
-                  <div className="font-semibold">{p.name}</div>
-                  <div className="mt-0.5 text-sm text-muted-foreground">{p.role}</div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
