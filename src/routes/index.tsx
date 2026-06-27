@@ -16,14 +16,6 @@ export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
-const DEPARTMENTS = [
-  { name: "الرياضيات", code: "ر" },
-  { name: "الفيزياء", code: "ف" },
-  { name: "الكيمياء", code: "ك" },
-  { name: "الجيولوجيا", code: "ج" },
-  { name: "النبات والميكروبيولوجي", code: "ن" },
-  { name: "علم الحيوان", code: "د" },
-];
 
 const DEGREES_SINGLE = [
   "الرياضيات", "الإحصاء", "علوم الحاسب", "الفيزياء",
@@ -170,23 +162,58 @@ function LandingPage() {
       </section>
 
       {/* Departments */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10">
+      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10 space-y-6">
+
+        {/* General Departments */}
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="mb-6 text-center">
-            <h2 className="font-display text-3xl">أقسام الكلية</h2>
-            <p className="mt-2 text-sm text-muted-foreground">ستة أقسام علمية — مادة (1) من اللائحة الداخلية</p>
+            <h2 className="font-display text-3xl">الأقسام العامة</h2>
+            <p className="mt-2 text-sm text-muted-foreground">مرتبة حسب الرغبة</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {DEPARTMENTS.map((d) => (
-              <div key={d.name} className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-background/40 p-4 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-cosmic text-primary-foreground text-sm font-bold">
-                  {d.code}
-                </div>
-                <span className="text-sm font-medium">{d.name}</span>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {[
+              "الكيمياء", "الكيمياء وعلم الحيوان", "الفيزياء والكيمياء",
+              "الكيمياء والجيولوجيا", "الكيمياء والنبات", "الكيمياء والحشرات",
+              "الكيمياء والميكروبيولوجي", "الميكروبيولوجي", "الجيولوجيا",
+              "علوم الحاسب", "الفيزياء والإلكترونيات", "علم الحيوان",
+              "النبات", "الجيوفيزياء", "الفيزياء", "الرياضيات",
+              "الإحصاء", "جيولوجيا البترول", "علم المصايد", "علم الحشرات",
+              "الرياضيات والفيزياء",
+            ].map((d, i) => (
+              <div key={d} className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+                <span className="text-xs font-bold text-accent shrink-0">رغبة {i + 1}</span>
+                <span className="text-xs font-medium">{d}</span>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Special Departments */}
+        <div className="cosmic-card rounded-3xl p-8 md:p-10">
+          <div className="mb-6 text-center">
+            <h2 className="font-display text-3xl">الأقسام المميزة ⭐</h2>
+            <p className="mt-2 text-sm text-muted-foreground">أقسام متخصصة داخل الكلية</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[
+              { name: "الكيمياء الصناعية والتطبيقية", note: null },
+              { name: "جيولوجيا بترول", note: null },
+              { name: "بايو تكنولوجي", note: null },
+              { name: "الفيزياء الإشعاعية الطبية", note: "بداية من سنة أولى فقط" },
+            ].map((d) => (
+              <div key={d.name} className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3">
+                <span className="mt-0.5 h-2 w-2 rounded-full bg-accent shrink-0" />
+                <div>
+                  <span className="text-sm font-semibold">{d.name}</span>
+                  {d.note && (
+                    <span className="mr-2 text-xs text-accent font-medium">({d.note})</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </section>
 
       {/* Degrees */}
