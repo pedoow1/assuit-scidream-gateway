@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link, Outlet } from "@tanstack/react-rout
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Plus, BookOpen, Search, X } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, BookOpen, Search, X, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { CosmicBackground } from "@/components/CosmicBackground";
@@ -39,6 +39,15 @@ function SubjectsPage() {
   const [year, setYear] = useState<number>(0);
   const [q, setQ] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+
+  async function deleteSubject(id: string) {
+    if (!confirm("متأكد إنك عايز تمسح المادة؟ هتمسح كل الفولدرات والمحتوى والاختبارات اللي جواها كمان.")) return;
+    const { error } = await supabase.from("subjects").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("اتمسحت المادة");
+    qc.invalidateQueries({ queryKey: ["subjects"] });
+  }
 
   useEffect(() => {
     if (loading) return;
@@ -126,36 +135,63 @@ function SubjectsPage() {
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((s) => (
-              <Link
+              <div
                 key={s.id}
-                to="/subjects/$subjectId"
-                params={{ subjectId: s.id }}
                 className="cosmic-card group flex flex-col gap-3 rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-glow"
               >
-                <div className="flex items-start justify-between">
-                  <div className="rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">
-                    {s.code}
+                <Link
+                  to="/subjects/$subjectId"
+                  params={{ subjectId: s.id }}
+                  className="flex flex-1 flex-col gap-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">
+                      {s.code}
+                    </div>
+                    <div className="text-xs text-muted-foreground">السنة {s.year} · ف{s.semester}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">السنة {s.year} · ف{s.semester}</div>
-                </div>
-                <div>
-                  <h3 className="font-display text-lg leading-tight">{s.name_ar}</h3>
-                  {s.name_en && <div className="text-xs text-muted-foreground">{s.name_en}</div>}
-                </div>
-                <div className="mt-auto flex items-center justify-between text-xs">
-                  <span className="rounded-full bg-secondary px-2.5 py-1">{s.department}</span>
-                  <span className="text-muted-foreground">{s.credit_hours ?? 3} ساعة</span>
-                </div>
-              </Link>
+                  <div>
+                    <h3 className="font-display text-lg leading-tight">{s.name_ar}</h3>
+                    {s.name_en && <div className="text-xs text-muted-foreground">{s.name_en}</div>}
+                  </div>
+                  <div className="mt-auto flex items-center justify-between text-xs">
+                    <span className="rounded-full bg-secondary px-2.5 py-1">{s.department}</span>
+                    <span className="text-muted-foreground">{s.credit_hours ?? 3} ساعة</span>
+                  </div>
+                </Link>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 border-t border-border/50 pt-3">
+                    <button
+                      onClick={() => setEditingSubject(s)}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-card/60 px-3 py-1.5 text-xs font-medium hover:border-accent"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> تعديل
+                    </button>
+                    <button
+                      onClick={() => deleteSubject(s.id)}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> حذف
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
       </main>
 
       {showCreate && (
-        <CreateSubjectModal
+        <SubjectModal
           onClose={() => setShowCreate(false)}
-          onCreated={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setShowCreate(false); }}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setShowCreate(false); }}
+        />
+      )}
+      {editingSubject && (
+        <SubjectModal
+          subject={editingSubject}
+          onClose={() => setEditingSubject(null)}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setEditingSubject(null); }}
         />
       )}
       <Outlet />
@@ -163,42 +199,46 @@ function SubjectsPage() {
   );
 }
 
-function CreateSubjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [code, setCode] = useState("");
-  const [nameAr, setNameAr] = useState("");
-  const [nameEn, setNameEn] = useState("");
-  const [department, setDepartment] = useState("الرياضيات");
-  const [year, setYear] = useState(1);
-  const [semester, setSemester] = useState(1);
-  const [creditHours, setCreditHours] = useState(3);
-  const [description, setDescription] = useState("");
+function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClose: () => void; onSaved: () => void }) {
+  const isEdit = !!subject;
+  const [code, setCode] = useState(subject?.code ?? "");
+  const [nameAr, setNameAr] = useState(subject?.name_ar ?? "");
+  const [nameEn, setNameEn] = useState(subject?.name_en ?? "");
+  const [department, setDepartment] = useState(subject?.department ?? "الرياضيات");
+  const [year, setYear] = useState(subject?.year ?? 1);
+  const [semester, setSemester] = useState(subject?.semester ?? 1);
+  const [creditHours, setCreditHours] = useState(subject?.credit_hours ?? 3);
+  const [description, setDescription] = useState(subject?.description ?? "");
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!code.trim() || !nameAr.trim()) return toast.error("الكود والاسم العربي مطلوبين");
     setSaving(true);
-    const { error } = await supabase.from("subjects").insert({
+    const payload = {
       code: code.trim(), name_ar: nameAr.trim(), name_en: nameEn.trim() || null,
       department, year, semester, credit_hours: creditHours, description: description.trim() || null,
-    });
+    };
+    const { error } = isEdit
+      ? await supabase.from("subjects").update(payload).eq("id", subject!.id)
+      : await supabase.from("subjects").insert(payload);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("اتضافت المادة ✨");
-    onCreated();
+    toast.success(isEdit ? "اتحفظ التعديل ✨" : "اتضافت المادة ✨");
+    onSaved();
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="cosmic-card w-full max-w-lg rounded-2xl bg-card p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl">إضافة مادة جديدة</h2>
+          <h2 className="font-display text-xl">{isEdit ? "تعديل المادة" : "إضافة مادة جديدة"}</h2>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-secondary"><X className="h-4 w-4" /></button>
         </div>
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
           <input className="modal-input" placeholder="الكود (مثل MATH101)" value={code} onChange={(e) => setCode(e.target.value)} required />
           <input className="modal-input" placeholder="الاسم بالعربي" value={nameAr} onChange={(e) => setNameAr(e.target.value)} required />
-          <input className="modal-input sm:col-span-2" placeholder="الاسم بالإنجليزي (اختياري)" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
+          <input className="modal-input sm:col-span-2" placeholder="الاسم بالإنجليزي (اختياري)" value={nameEn ?? ""} onChange={(e) => setNameEn(e.target.value)} />
           <select className="modal-input" value={department} onChange={(e) => setDepartment(e.target.value)}>
             {DEPARTMENTS.slice(1).map((d) => <option key={d}>{d}</option>)}
           </select>
@@ -208,10 +248,10 @@ function CreateSubjectModal({ onClose, onCreated }: { onClose: () => void; onCre
           <select className="modal-input" value={semester} onChange={(e) => setSemester(Number(e.target.value))}>
             <option value={1}>الفصل الأول</option><option value={2}>الفصل الثاني</option>
           </select>
-          <input type="number" min={1} max={6} className="modal-input" value={creditHours} onChange={(e) => setCreditHours(Number(e.target.value))} />
-          <textarea className="modal-input sm:col-span-2" placeholder="وصف مختصر (اختياري)" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <input type="number" min={1} max={6} className="modal-input" value={creditHours ?? 3} onChange={(e) => setCreditHours(Number(e.target.value))} />
+          <textarea className="modal-input sm:col-span-2" placeholder="وصف مختصر (اختياري)" rows={2} value={description ?? ""} onChange={(e) => setDescription(e.target.value)} />
           <button type="submit" disabled={saving} className="sm:col-span-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-            {saving ? "جاري الحفظ..." : "حفظ"}
+            {saving ? "جاري الحفظ..." : isEdit ? "حفظ التعديل" : "حفظ"}
           </button>
         </form>
         <style>{`.modal-input { width: 100%; background: color-mix(in oklch, var(--background) 60%, transparent); border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.55rem 0.75rem; font-size: 0.9rem; outline: none; font-family: inherit; }
