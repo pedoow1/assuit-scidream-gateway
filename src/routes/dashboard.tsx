@@ -13,11 +13,11 @@ export const Route = createFileRoute("/dashboard")({
 
 const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string }[] = [
   { icon: BookOpen, label: "المواد", color: "from-rose/60 to-gold/40", to: "/subjects" },
-  { icon: Brain, label: "الاختبارات", color: "from-gold/60 to-rose/40" },
+  { icon: Brain, label: "الاختبارات", color: "from-gold/60 to-rose/40", to: "/quizzes" },
   { icon: Calculator, label: "حاسبة GPA", color: "from-cosmic/40 to-rose/40", to: "/gpa" },
-  { icon: FileText, label: "ملاحظاتي", color: "from-rose/40 to-cosmic/40" },
-  { icon: Sparkles, label: "المساعد الذكي", color: "from-gold/40 to-cosmic/40" },
-  { icon: Bell, label: "الإعلانات", color: "from-cosmic/40 to-gold/40" },
+  { icon: FileText, label: "ملاحظاتي", color: "from-rose/40 to-cosmic/40", to: "/notes" },
+  { icon: Sparkles, label: "المساعد الذكي", color: "from-gold/40 to-cosmic/40", to: "/assistant" },
+  { icon: Bell, label: "الإعلانات", color: "from-cosmic/40 to-gold/40", to: "/announcements" },
 ];
 
 const AUDITORIUMS = [
@@ -167,9 +167,6 @@ function Dashboard() {
               );
             })}
           </div>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            ✨ باقي الأقسام بتيتم تجهيزها — المواد جاهزة دلوقتي.
-          </p>
         </div>
 
         {/* Locations */}
