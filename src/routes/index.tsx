@@ -312,6 +312,71 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* Leadership & Team */}
+      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10">
+        <div className="mb-8 text-center">
+          <h2 className="font-display text-3xl md:text-4xl">قيادة الكلية والفريق</h2>
+        </div>
+
+        {/* College Leadership */}
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">قيادة الكلية</div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {[
+              { name: "أ.د أبو بكر محمد الطيب", role: "عميد الكلية", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0021.jpg" },
+              { name: "أ.د محمد أبو العيون", role: "وكيل الكلية لشئون تعليم الطلاب", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0022.jpg" },
+            ].map((p) => (
+              <motion.div
+                key={p.name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="cosmic-card rounded-2xl p-6 flex items-center gap-5"
+              >
+                <img
+                  src={p.img}
+                  alt={p.name}
+                  className="h-20 w-20 rounded-full object-cover border-2 border-accent/40 shrink-0"
+                />
+                <div>
+                  <div className="font-display text-lg leading-tight">{p.name}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{p.role}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Dream Team */}
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">فريق Dream Team</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { name: "عبد الله قطب", role: "مسؤول السوشيال ميديا", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6193778187.png" },
+              { name: "خالد عماد", role: "مقرر الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0026.jpg" },
+            ].map((p) => (
+              <motion.div
+                key={p.name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="cosmic-card rounded-2xl p-5 flex items-center gap-4"
+              >
+                <img
+                  src={p.img}
+                  alt={p.name}
+                  className="h-16 w-16 rounded-full object-cover border-2 border-border shrink-0"
+                />
+                <div>
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="mt-0.5 text-sm text-muted-foreground">{p.role}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="relative z-10 mx-auto max-w-4xl px-6 pb-20">
         <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-cosmic p-10 text-center text-primary-foreground shadow-rose">
