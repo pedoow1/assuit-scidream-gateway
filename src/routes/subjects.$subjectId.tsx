@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Loader2, ArrowLeft, FolderPlus, Folder, FileText, Youtube, Link as LinkIcon,
-  Plus, ChevronLeft, X, Trash2, Upload, Download, HardDriveDownload,
+  Plus, ChevronLeft, X, Trash2, Upload, Download, HardDriveDownload, Pencil,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
@@ -38,6 +38,7 @@ function SubjectDetailPage() {
 
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [showAddFolder, setShowAddFolder] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [showAddContent, setShowAddContent] = useState(false);
   const [showImportDrive, setShowImportDrive] = useState(false);
 
@@ -212,9 +213,14 @@ function SubjectDetailPage() {
                         <div className="font-medium">{f.name}</div>
                       </button>
                       {isAdmin && (
-                        <button onClick={() => deleteFolder(f.id)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-0.5">
+                          <button onClick={() => setEditingFolder(f)} className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => deleteFolder(f.id)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -253,6 +259,15 @@ function SubjectDetailPage() {
           parentId={currentFolderId}
           onClose={() => setShowAddFolder(false)}
           onDone={() => { qc.invalidateQueries({ queryKey: ["folders", subjectId] }); setShowAddFolder(false); }}
+        />
+      )}
+      {editingFolder && (
+        <AddFolderModal
+          subjectId={subjectId}
+          parentId={editingFolder.parent_id}
+          folder={editingFolder}
+          onClose={() => setEditingFolder(null)}
+          onDone={() => { qc.invalidateQueries({ queryKey: ["folders", subjectId] }); setEditingFolder(null); }}
         />
       )}
       {showAddContent && currentFolderId && (
@@ -349,27 +364,30 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
   );
 }
 
-function AddFolderModal({ subjectId, parentId, onClose, onDone }: {
-  subjectId: string; parentId: string | null; onClose: () => void; onDone: () => void;
+function AddFolderModal({ subjectId, parentId, folder, onClose, onDone }: {
+  subjectId: string; parentId: string | null; folder?: Folder; onClose: () => void; onDone: () => void;
 }) {
-  const [name, setName] = useState("");
+  const isEdit = !!folder;
+  const [name, setName] = useState(folder?.name ?? "");
   const [saving, setSaving] = useState(false);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
-    const { error } = await supabase.from("folders").insert({ subject_id: subjectId, parent_id: parentId, name: name.trim() });
+    const { error } = isEdit
+      ? await supabase.from("folders").update({ name: name.trim() }).eq("id", folder!.id)
+      : await supabase.from("folders").insert({ subject_id: subjectId, parent_id: parentId, name: name.trim() });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("اتضاف الفولدر");
+    toast.success(isEdit ? "اتعدل اسم الفولدر" : "اتضاف الفولدر");
     onDone();
   }
   return (
-    <ModalShell title="فولدر جديد" onClose={onClose}>
+    <ModalShell title={isEdit ? "تعديل اسم الفولدر" : "فولدر جديد"} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         <input autoFocus className="modal-input" placeholder="اسم الفولدر (مثل: المحاضرة الأولى)" value={name} onChange={(e) => setName(e.target.value)} />
         <button type="submit" disabled={saving} className="w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-          {saving ? "جاري..." : "إضافة"}
+          {saving ? "جاري..." : isEdit ? "حفظ" : "إضافة"}
         </button>
       </form>
     </ModalShell>
