@@ -314,15 +314,15 @@ function LandingPage() {
               <tbody className="divide-y divide-border/50">
                 {[
                   { grade: "ممتاز", symbol: "A", points: "4.0", range: "90 – 100%" },
-                  { grade: "جيد جداً -", symbol: "A-", points: "3.7", range: "85 – <90%" },
-                  { grade: "جيد جداً +", symbol: "B+", points: "3.3", range: "80 – <85%" },
+                  { grade: "ممتاز", symbol: "A-", points: "3.7", range: "85 – <90%" },
+                  { grade: "جيد جداً", symbol: "B+", points: "3.3", range: "80 – <85%" },
                   { grade: "جيد جداً", symbol: "B", points: "3.0", range: "75 – <80%" },
-                  { grade: "جيد -", symbol: "B-", points: "2.7", range: "70 – <75%" },
-                  { grade: "مقبول +", symbol: "C+", points: "2.3", range: "65 – <70%" },
+                  { grade: "جيد", symbol: "B-", points: "2.7", range: "70 – <75%" },
+                  { grade: "جيد", symbol: "C+", points: "2.3", range: "65 – <70%" },
                   { grade: "مقبول", symbol: "C", points: "2.0", range: "60 – <65%" },
-                  { grade: "مقبول -", symbol: "C-", points: "1.7", range: "57 – <60%" },
-                  { grade: "ضعيف +", symbol: "D+", points: "1.3", range: "55 – <57%" },
-                  { grade: "ضعيف", symbol: "D", points: "1.0", range: "50 – <55%" },
+                  { grade: "مقبول", symbol: "C-", points: "1.7", range: "57 – <60%" },
+                  { grade: "مقبول", symbol: "D+", points: "1.3", range: "55 – <57%" },
+                  { grade: "مقبول", symbol: "D", points: "1.0", range: "50 – <55%" },
                   { grade: "راسب", symbol: "F", points: "0", range: "< 50%" },
                 ].map((row) => (
                   <tr key={row.symbol} className="text-xs hover:bg-card/40 transition">
