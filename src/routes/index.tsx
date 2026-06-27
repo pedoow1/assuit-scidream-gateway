@@ -336,7 +336,7 @@ function LandingPage() {
                 <img
                   src={p.img}
                   alt={p.name}
-                  className="h-20 w-20 rounded-full object-cover border-2 border-accent/40 shrink-0"
+                  className="h-20 w-20 rounded-full object-cover object-top border-2 border-accent/40 shrink-0"
                 />
                 <div>
                   <div className="font-display text-lg leading-tight">{p.name}</div>
@@ -365,7 +365,7 @@ function LandingPage() {
                 <img
                   src={p.img}
                   alt={p.name}
-                  className="h-16 w-16 rounded-full object-cover border-2 border-border shrink-0"
+                  className="h-16 w-16 rounded-full object-cover object-top border-2 border-border shrink-0"
                 />
                 <div>
                   <div className="font-semibold">{p.name}</div>
