@@ -168,7 +168,6 @@ function LandingPage() {
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="mb-6 text-center">
             <h2 className="font-display text-3xl">الأقسام العامة</h2>
-            <p className="mt-2 text-sm text-muted-foreground">مرتبة حسب الرغبة</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {[
@@ -179,9 +178,9 @@ function LandingPage() {
               "النبات", "الجيوفيزياء", "الفيزياء", "الرياضيات",
               "الإحصاء", "جيولوجيا البترول", "علم المصايد", "علم الحشرات",
               "الرياضيات والفيزياء",
-            ].map((d, i) => (
+            ].map((d) => (
               <div key={d} className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
-                <span className="text-xs font-bold text-accent shrink-0">رغبة {i + 1}</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
                 <span className="text-xs font-medium">{d}</span>
               </div>
             ))}
