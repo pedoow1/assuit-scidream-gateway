@@ -393,7 +393,14 @@ function AddContentModal({ folderId, onClose, onDone }: { folderId: string; onCl
       let payload: Record<string, unknown> = { folder_id: folderId, type, title: title.trim(), description: description.trim() || null };
       if (type === "pdf") {
         if (!file) throw new Error("اختر ملف PDF");
-        const path = `${folderId}/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+        const ext = file.name.split(".").pop() ?? "pdf";
+        const safeName = file.name
+          .replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+/g, "") // remove Arabic
+          .replace(/\s+/g, "_")           // spaces → underscore
+          .replace(/[^a-zA-Z0-9._-]/g, "") // remove any other special chars
+          .replace(/^_+|_+$/g, "")         // trim underscores
+          || `file.${ext}`;               // fallback if name becomes empty
+        const path = `${folderId}/${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage.from("subject-files").upload(path, file);
         if (upErr) throw upErr;
         payload.file_url = path;
