@@ -376,6 +376,25 @@ function LandingPage() {
         {/* Dream Team */}
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">فريق Dream Team</div>
+
+          {/* نبذة عن الأسرة */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="cosmic-card rounded-2xl p-6 mb-6 text-center"
+          >
+            <h3 className="font-display text-xl mb-3">Dream Team – كلية العلوم</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">Dream Team</strong> أسرة طلابية في كلية العلوم — جامعة أسيوط، تسعى إلى بناء بيئة جامعية قائمة على التعاون والإبداع والتطوير المستمر.
+              {" "}ندعم الطلاب من خلال الأنشطة العلمية والثقافية والرياضية والاجتماعية، ونوفر لهم فرصاً حقيقية لاكتساب مهارات جديدة وتنمية روح القيادة والعمل الجماعي.
+            </p>
+            <p className="mt-4 font-semibold text-accent italic">We Dream. We Explore. We Discover.</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              لأننا نؤمن أن كل طالب يملك القدرة على تحقيق طموحه وترك بصمة حقيقية داخل الكلية وخارجها.
+            </p>
+          </motion.div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               { name: "عبد الله قطب", role: "مسؤول السوشيال ميديا", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6193778187.png" },
