@@ -167,9 +167,6 @@ function Dashboard() {
               );
             })}
           </div>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            ✨ باقي الأقسام بتيتم تجهيزها — المواد جاهزة دلوقتي.
-          </p>
         </div>
 
         {/* Locations */}
