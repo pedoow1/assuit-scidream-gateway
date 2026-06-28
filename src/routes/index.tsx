@@ -453,6 +453,7 @@ function LandingPage() {
             className="mt-8"
           >
             <CommitteeApplicationSection />
+          </motion.div>
 
           {/* نبذة عن الأسرة */}
           <motion.div
