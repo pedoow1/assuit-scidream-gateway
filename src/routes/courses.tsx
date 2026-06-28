@@ -22,7 +22,7 @@ type CourseFile = {
 const BUCKET = "courses";
 
 function CoursesPage() {
-  const { user, profile, roles, loading } = useAuth();
+  const { user, roles, loading } = useAuth();
   const navigate = useNavigate();
   const [files, setFiles] = useState<CourseFile[]>([]);
   const [fetching, setFetching] = useState(true);
@@ -63,11 +63,22 @@ function CoursesPage() {
     loadFiles();
   }
 
+  async function getSignedUrl(fileName: string) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(fileName, 3600);
+    if (error || !data) { toast.error("تعذر فتح الملف"); return null; }
+    return data.signedUrl;
+  }
+
+  async function handleOpen(fileName: string) {
+    const url = await getSignedUrl(fileName);
+    if (url) window.open(url, "_blank");
+  }
+
   async function handleDownload(fileName: string) {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(fileName, 60);
-    if (error || !data) { toast.error("تعذر تحميل الملف"); return; }
+    const url = await getSignedUrl(fileName);
+    if (!url) return;
     const a = document.createElement("a");
-    a.href = data.signedUrl;
+    a.href = url;
     a.download = fileName;
     a.click();
   }
@@ -85,6 +96,11 @@ function CoursesPage() {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function cleanName(fileName: string) {
+    // Remove timestamp prefix like "1782675097643_"
+    return fileName.replace(/^\d+_/, "");
   }
 
   if (loading || !user) {
@@ -157,26 +173,38 @@ function CoursesPage() {
             <ul className="divide-y divide-border/40">
               {files.map((f) => (
                 <li key={f.id ?? f.name} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-card/40 transition">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-sm">{f.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {formatSize(f.metadata?.size)} · {new Date(f.updated_at).toLocaleDateString("ar-EG")}
+                  {/* اسم الملف قابل للضغط → يفتح */}
+                  <button
+                    onClick={() => handleOpen(f.name)}
+                    className="flex flex-1 items-center gap-3 text-right min-w-0"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gold/40 to-rose/30 text-lg">
+                      📄
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-sm">{cleanName(f.name)}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {formatSize(f.metadata?.size)} · {new Date(f.updated_at).toLocaleDateString("ar-EG")}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* أزرار التحميل والحذف */}
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleDownload(f.name)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition"
+                      className="rounded-full p-2 text-muted-foreground hover:bg-secondary transition"
+                      title="تحميل"
                     >
-                      <Download className="h-3.5 w-3.5" /> تحميل
+                      <Download className="h-4 w-4" />
                     </button>
                     {isAdmin && (
                       <button
                         onClick={() => handleDelete(f.name)}
-                        className="rounded-lg bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20 transition"
+                        className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
                         title="حذف"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                   </div>
