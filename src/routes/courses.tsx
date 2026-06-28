@@ -154,6 +154,35 @@ function CoursesPage() {
           </div>
         )}
 
+        {/* Description card */}
+        <div className="cosmic-card rounded-2xl p-6 space-y-3">
+          <div className="flex items-center gap-2 text-accent font-semibold text-sm">
+            <span>📋</span>
+            <span>دليل التدريب الميداني — Dream Team</span>
+          </div>
+          <p className="text-sm leading-relaxed">
+            أعددنا لكم هذا الدليل الشامل بجهد أبناء أسرة <span className="font-bold">Dream Team</span> من مختلف أقسام كليات العلوم على مستوى الجمهورية.
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {[
+              "المراكز البحثية والجامعات الخاصة",
+              "مراكز الحقن المجهري ومعامل التحاليل",
+              "مراكز الأشعة وشركات الأدوية",
+              "شركات الصناعات الغذائية",
+              "معاهد ومراكز علاج الأورام",
+              "شركات البترول",
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-1.5 rounded-lg border border-border/50 bg-background/30 px-3 py-2">
+                <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-foreground/75 border-t border-border/40 pt-3">
+            الدليل في تحديث مستمر — كل جديد نضيفه فور توفره. نتمنى أن يكون عوناً حقيقياً في مسيرتكم العلمية 🌟
+          </p>
+        </div>
+
         {/* Files list */}
         <div className="cosmic-card rounded-2xl overflow-hidden">
           <div className="border-b border-border/60 px-6 py-4">
