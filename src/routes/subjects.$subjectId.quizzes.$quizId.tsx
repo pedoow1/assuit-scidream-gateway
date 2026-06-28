@@ -73,7 +73,7 @@ function QuizPage() {
       <CosmicBackground density={22} />
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/subjects/$subjectId/quizzes" params={{ subjectId }} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/subjects/$subjectId/quizzes" params={{ subjectId }} className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
             <ArrowLeft className="h-4 w-4 rotate-180" /> رجوع للاختبارات
           </Link>
         </div>
@@ -93,7 +93,7 @@ function QuizPage() {
 function NotFound({ subjectId }: { subjectId: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="cosmic-card rounded-2xl p-6 text-center text-sm text-muted-foreground">
+      <div className="cosmic-card rounded-2xl p-6 text-center text-sm text-foreground/75">
         الاختبار مش موجود.
         <Link to="/subjects/$subjectId/quizzes" params={{ subjectId }} className="mt-3 block text-accent">رجوع</Link>
       </div>
@@ -119,7 +119,7 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
     <>
       <div className="cosmic-card rounded-3xl p-6 md:p-8">
         <h1 className="font-display text-2xl md:text-3xl">{quiz.title}</h1>
-        {quiz.description && <p className="mt-2 text-sm text-muted-foreground">{quiz.description}</p>}
+        {quiz.description && <p className="mt-2 text-sm text-foreground/75">{quiz.description}</p>}
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-secondary px-3 py-1">{questions.length} سؤال</span>
           {quiz.time_limit_min && <span className="rounded-full bg-secondary px-3 py-1">{quiz.time_limit_min} دقيقة</span>}
@@ -139,7 +139,7 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
 
       <div className="mt-6 space-y-3">
         {questions.length === 0 ? (
-          <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-muted-foreground">لسه مفيش أسئلة.</div>
+          <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">لسه مفيش أسئلة.</div>
         ) : (
           questions.map((q, i) => (
             <div key={q.id} className="cosmic-card rounded-2xl p-4">
@@ -150,7 +150,7 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
                     <span className="rounded-full bg-secondary px-2 py-0.5">
                       {q.type === "mcq" ? "اختيار" : q.type === "true_false" ? "صح/خطأ" : "مقالي"}
                     </span>
-                    <span className="text-muted-foreground">{q.points} درجة</span>
+                    <span className="text-foreground/75">{q.points} درجة</span>
                   </div>
                   <p className="mt-2 text-sm leading-relaxed">{q.prompt}</p>
                   {q.type === "mcq" && q.options && (
@@ -165,7 +165,7 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
                   {q.type === "true_false" && (
                     <div className="mt-2 text-xs">الإجابة: <span className="font-semibold">{q.correct_answer === "true" ? "صح" : "خطأ"}</span></div>
                   )}
-                  {q.explanation && <div className="mt-2 rounded bg-secondary/40 p-2 text-xs text-muted-foreground">💡 {q.explanation}</div>}
+                  {q.explanation && <div className="mt-2 rounded bg-secondary/40 p-2 text-xs text-foreground/75">💡 {q.explanation}</div>}
                 </div>
                 <button onClick={() => deleteQ(q.id)} className="rounded p-1.5 text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
@@ -268,7 +268,7 @@ function AddQuestionModal({ quizId, nextOrder, onClose }: { quizId: string; next
               {options.length < 6 && (
                 <button type="button" onClick={() => setOptions((arr) => [...arr, ""])} className="text-xs text-accent">+ خيار</button>
               )}
-              <p className="text-[11px] text-muted-foreground">اختار الدائرة على يمين الإجابة الصحيحة.</p>
+              <p className="text-[11px] text-foreground/75">اختار الدائرة على يمين الإجابة الصحيحة.</p>
             </div>
           )}
 
@@ -289,7 +289,7 @@ function AddQuestionModal({ quizId, nextOrder, onClose }: { quizId: string; next
 
           <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="شرح الإجابة (اختياري)" rows={2} className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 outline-none focus:border-accent" />
           <label className="block">
-            <span className="mb-1 block text-xs text-muted-foreground">الدرجة</span>
+            <span className="mb-1 block text-xs text-foreground/75">الدرجة</span>
             <input type="number" min={1} value={points} onChange={(e) => setPoints(Number(e.target.value) || 1)} className="w-32 rounded-lg border border-border bg-background/60 px-3 py-2 outline-none focus:border-accent" />
           </label>
 
@@ -402,7 +402,7 @@ function BulkImportModal({ quizId, startOrder, onClose }: { quizId: string; star
           <h2 className="font-display text-xl">استيراد جماعي</h2>
           <button onClick={onClose}><X className="h-5 w-5" /></button>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/75">
           ارفع <strong>CSV</strong> أو الصق <strong>JSON array</strong>. الأعمدة المدعومة: type, prompt, option1..6, correct, explanation, points.
           <br />للأسئلة MCQ <code>correct</code> = رقم الخيار (يبدأ من 0). صح/خطأ = <code>true</code>/<code>false</code>.
         </p>
@@ -490,14 +490,14 @@ function TakeQuiz({ quiz, questions, userId, subjectId }: { quiz: Quiz; question
 
   if (!quiz.is_published) {
     return (
-      <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-muted-foreground">
+      <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">
         الاختبار ده مش منشور لسه.
       </div>
     );
   }
 
   if (!questions.length) {
-    return <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-muted-foreground">الاختبار فاضي.</div>;
+    return <div className="cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">الاختبار فاضي.</div>;
   }
 
   if (submitted) {
@@ -510,7 +510,7 @@ function TakeQuiz({ quiz, questions, userId, subjectId }: { quiz: Quiz; question
           </div>
           <h2 className="mt-4 font-display text-3xl">{passed ? "مبروك ✨" : "حاول تاني"}</h2>
           <div className="mt-2 text-5xl font-bold text-gradient-cosmic">{submitted.pct.toFixed(0)}%</div>
-          <div className="mt-1 text-sm text-muted-foreground">{submitted.score} / {submitted.total} درجة</div>
+          <div className="mt-1 text-sm text-foreground/75">{submitted.score} / {submitted.total} درجة</div>
         </div>
 
         <div className="mt-6 space-y-3">
@@ -536,13 +536,13 @@ function TakeQuiz({ quiz, questions, userId, subjectId }: { quiz: Quiz; question
                   {d.q.type === "true_false" && (
                     <div className="mt-2 text-xs">
                       إجابتك: <span className={d.correct ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{d.given === "true" ? "صح" : d.given === "false" ? "خطأ" : "—"}</span>
-                      {!d.correct && <span className="ml-2 text-muted-foreground">(الصح: {d.q.correct_answer === "true" ? "صح" : "خطأ"})</span>}
+                      {!d.correct && <span className="ml-2 text-foreground/75">(الصح: {d.q.correct_answer === "true" ? "صح" : "خطأ"})</span>}
                     </div>
                   )}
                   {d.q.type === "essay" && (
                     <div className="mt-2 space-y-2 text-xs">
-                      <div className="rounded bg-background/40 p-2"><div className="text-muted-foreground">إجابتك:</div>{d.given || "—"}</div>
-                      {d.q.correct_answer && <div className="rounded bg-gold/20 p-2"><div className="text-muted-foreground">الإجابة النموذجية:</div>{d.q.correct_answer}</div>}
+                      <div className="rounded bg-background/40 p-2"><div className="text-foreground/75">إجابتك:</div>{d.given || "—"}</div>
+                      {d.q.correct_answer && <div className="rounded bg-gold/20 p-2"><div className="text-foreground/75">الإجابة النموذجية:</div>{d.q.correct_answer}</div>}
                     </div>
                   )}
                   {d.q.explanation && <div className="mt-2 rounded bg-secondary/40 p-2 text-xs">💡 {d.q.explanation}</div>}
@@ -563,7 +563,7 @@ function TakeQuiz({ quiz, questions, userId, subjectId }: { quiz: Quiz; question
     return (
       <div className="cosmic-card rounded-3xl p-8 text-center">
         <h1 className="font-display text-3xl">{quiz.title}</h1>
-        {quiz.description && <p className="mt-2 text-sm text-muted-foreground">{quiz.description}</p>}
+        {quiz.description && <p className="mt-2 text-sm text-foreground/75">{quiz.description}</p>}
         <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
           <span className="rounded-full bg-secondary px-3 py-1">{questions.length} سؤال</span>
           {quiz.time_limit_min && <span className="rounded-full bg-secondary px-3 py-1">{quiz.time_limit_min} دقيقة</span>}
