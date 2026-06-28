@@ -579,7 +579,7 @@ function Fortunecookie() {
                 pointerEvents: "none",
               }}
             >
-              اكسرني! 🤫
+              رسالة لك 💛
             </motion.div>
           )}
         </button>
