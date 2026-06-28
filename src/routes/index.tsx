@@ -154,6 +154,10 @@ function LandingPage() {
 
       {/* Vision & Mission */}
       <section id="vision" className="relative z-10 mx-auto max-w-6xl px-6 py-10">
+        <div className="cosmic-card rounded-3xl p-8 md:p-12">
+          <div className="mb-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-widest text-accent">عن الكلية</div>
+            <h2 className="mt-2 font-display text-3xl md:text-4xl">الرؤية والرسالة</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-gradient-to-bl from-card to-secondary/40 p-6">
