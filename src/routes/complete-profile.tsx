@@ -114,7 +114,7 @@ function CompleteProfilePage() {
     <div className="relative min-h-screen px-4 py-10">
       <CosmicBackground density={28} />
       <div className="relative z-10 mx-auto max-w-xl">
-        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
           <ArrowLeft className="h-4 w-4 rotate-180" /> الرئيسية
         </Link>
 
@@ -122,7 +122,7 @@ function CompleteProfilePage() {
           <div className="text-center">
             <Logo size={64} className="mx-auto" />
             <h1 className="mt-3 font-display text-3xl">استكمال بياناتك</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-foreground/75">
               عشان نأكد إنك طالب في كلية العلوم، محتاجين منك البيانات دي.
             </p>
           </div>
@@ -179,7 +179,7 @@ function CompleteProfilePage() {
                   <Upload className="h-4 w-4 text-accent" />
                   {idFile ? idFile.name : profile?.id_card_url ? "البطاقة مرفوعة — اختر صورة جديدة" : "اضغط لاختيار صورة"}
                 </span>
-                <span className="text-xs text-muted-foreground">JPG / PNG</span>
+                <span className="text-xs text-foreground/75">JPG / PNG</span>
               </button>
               <input
                 ref={fileRef}
