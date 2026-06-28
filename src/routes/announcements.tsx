@@ -68,21 +68,23 @@ function AnnouncementsPage() {
   return (
     <div className="relative min-h-screen" dir="rtl">
       <CosmicBackground density={18} />
-      <main className="relative z-10 mx-auto max-w-3xl px-6 py-8">
-        <header className="mb-6 flex items-center justify-between">
-          <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent">
+      <header className="relative z-10 border-b border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+          <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm hover:text-accent">
             <ArrowRight className="h-4 w-4" /> الرئيسية
           </Link>
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-accent" />
-            <h1 className="font-display text-xl">الإعلانات</h1>
+            <h1 className="font-display text-xl font-semibold">الإعلانات</h1>
           </div>
           {isAdmin ? (
             <button onClick={() => setCreating((v) => !v)} className="inline-flex items-center gap-1 rounded-full bg-gradient-cosmic px-4 py-1.5 text-xs font-semibold text-primary-foreground shadow-rose">
               <Plus className="h-3.5 w-3.5" /> إضافة
             </button>
           ) : <span />}
-        </header>
+        </div>
+      </header>
+      <main className="relative z-10 mx-auto max-w-3xl px-6 py-8">
 
         {isAdmin && creating && (
           <div className="cosmic-card mb-6 rounded-3xl p-5 space-y-3">
@@ -103,7 +105,7 @@ function AnnouncementsPage() {
         {busy ? (
           <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-20">لا توجد إعلانات حالياً.</p>
+          <p className="text-center text-sm text-foreground/75 py-20">لا توجد إعلانات حالياً.</p>
         ) : (
           <div className="space-y-3">
             {items.map((a) => (
@@ -114,8 +116,8 @@ function AnnouncementsPage() {
                       {a.pinned && <Pin className="h-3.5 w-3.5 text-accent" />}
                       <h3 className="font-display text-lg">{a.title}</h3>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{a.body}</p>
-                    <div className="mt-2 text-[11px] text-muted-foreground">{new Date(a.created_at).toLocaleDateString("ar-EG")}</div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/75">{a.body}</p>
+                    <div className="mt-2 text-[11px] text-foreground/75">{new Date(a.created_at).toLocaleDateString("ar-EG")}</div>
                   </div>
                   {isAdmin && (
                     <div className="flex flex-col gap-2">
