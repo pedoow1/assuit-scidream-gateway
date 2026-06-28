@@ -79,7 +79,7 @@
   --secondary-foreground: oklch(0.15 0.08 265);
 
   --muted:            oklch(0.90 0.015 225 / 0.65);
-  --muted-foreground: oklch(0.28 0.06 250);   /* much darker — was 0.42 */
+  --muted-foreground: oklch(0.20 0.07 255);   /* very dark indigo — readable on light bg */
 
   --accent:            var(--gold);
   --accent-foreground: oklch(0.12 0.04 80);
