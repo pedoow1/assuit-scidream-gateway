@@ -117,7 +117,7 @@ function CoursesPage() {
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
             <ArrowLeft className="h-4 w-4 rotate-180" /> الرجوع
           </Link>
           <div className="flex items-center gap-3">
@@ -138,9 +138,9 @@ function CoursesPage() {
               {uploading ? (
                 <Loader2 className="h-8 w-8 animate-spin text-accent" />
               ) : (
-                <Upload className="h-8 w-8 text-muted-foreground" />
+                <Upload className="h-8 w-8 text-foreground/75" />
               )}
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-foreground/75">
                 {uploading ? "جاري الرفع..." : "اضغط هنا لرفع ملف أو أكتر"}
               </span>
               <input
@@ -196,7 +196,7 @@ function CoursesPage() {
           ) : files.length === 0 ? (
             <div className="py-16 text-center">
               <div className="text-4xl">📂</div>
-              <p className="mt-3 text-sm text-muted-foreground">لا توجد ملفات بعد</p>
+              <p className="mt-3 text-sm text-foreground/75">لا توجد ملفات بعد</p>
             </div>
           ) : (
             <ul className="divide-y divide-border/40">
@@ -212,7 +212,7 @@ function CoursesPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="truncate font-medium text-sm">{cleanName(f.name)}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
+                      <div className="text-xs text-foreground/75 mt-0.5">
                         {formatSize(f.metadata?.size)} · {new Date(f.updated_at).toLocaleDateString("ar-EG")}
                       </div>
                     </div>
@@ -222,7 +222,7 @@ function CoursesPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleDownload(f.name)}
-                      className="rounded-full p-2 text-muted-foreground hover:bg-secondary transition"
+                      className="rounded-full p-2 text-foreground/75 hover:bg-secondary transition"
                       title="تحميل"
                     >
                       <Download className="h-4 w-4" />
@@ -230,7 +230,7 @@ function CoursesPage() {
                     {isAdmin && (
                       <button
                         onClick={() => handleDelete(f.name)}
-                        className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                        className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive transition"
                         title="حذف"
                       >
                         <Trash2 className="h-4 w-4" />
