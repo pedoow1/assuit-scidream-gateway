@@ -83,13 +83,13 @@ function AuthPage() {
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <CosmicBackground density={35} />
       <div className="relative z-10 w-full max-w-md">
-        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
           <ArrowLeft className="h-4 w-4 rotate-180" /> العودة للرئيسية
         </Link>
         <div className="cosmic-card rounded-3xl p-8 text-center">
           <Logo size={84} className="mx-auto" />
           <h1 className="mt-4 font-display text-3xl">أهلاً بيك في Dream Team</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-foreground/75">
             سجل بحساب جوجل علشان تدخل لبوابة عباقرة كلية العلوم.
           </p>
 
@@ -108,12 +108,12 @@ function AuthPage() {
             )}
           </button>
 
-          <p className="mt-6 text-xs text-muted-foreground">
+          <p className="mt-6 text-xs text-foreground/75">
             بتسجيلك، أنت موافق على أن فريق Dream Team هيراجع بياناتك للتأكد إنك طالب في الكلية.
           </p>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-foreground/75">
           <LogIn className="h-3.5 w-3.5" />
           محتاج مساعدة؟ راسلنا على{" "}
           <a className="text-foreground hover:text-accent" href="mailto:abdalahkotp31@gmail.com">abdalahkotp31@gmail.com</a>
