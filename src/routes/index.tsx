@@ -121,12 +121,39 @@ function LandingPage() {
         </motion.div>
       </section>
 
+      {/* Quick Nav */}
+      <section className="relative z-10 mx-auto max-w-4xl px-6 pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+          className="flex flex-wrap justify-center gap-2"
+        >
+          {[
+            { label: "الرؤية والرسالة", href: "#vision", icon: "◈" },
+            { label: "أهداف الكلية", href: "#goals", icon: "◈" },
+            { label: "الأقسام", href: "#departments", icon: "◈" },
+            { label: "الفريق والقيادة", href: "#team", icon: "◈" },
+            { label: "انضم إلى Dream Team", href: "#join", icon: "✦" },
+          ].map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-medium transition hover:scale-105 ${
+                item.href === "#join"
+                  ? "border-accent/60 bg-accent/10 text-accent hover:bg-accent/20"
+                  : "border-border bg-card/50 text-foreground/75 hover:text-foreground hover:bg-card/80"
+              }`}
+            >
+              <span className="text-[10px] opacity-60">{item.icon}</span>
+              {item.label}
+            </a>
+          ))}
+        </motion.div>
+      </section>
+
       {/* Vision & Mission */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10">
-        <div className="cosmic-card rounded-3xl p-8 md:p-12">
-          <div className="mb-6 text-center">
-            <div className="text-xs font-semibold uppercase tracking-widest text-accent">عن الكلية</div>
-            <h2 className="mt-2 font-display text-3xl md:text-4xl">الرؤية والرسالة</h2>
+      <section id="vision" className="relative z-10 mx-auto max-w-6xl px-6 py-10">
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-gradient-to-bl from-card to-secondary/40 p-6">
@@ -155,7 +182,7 @@ function LandingPage() {
       </section>
 
       {/* Goals */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10">
+      <section id="goals" className="relative z-10 mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 text-center">
           <h2 className="font-display text-3xl md:text-4xl">أهداف الكلية</h2>
         </div>
@@ -179,7 +206,7 @@ function LandingPage() {
       </section>
 
       {/* Departments */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10 space-y-6">
+      <section id="departments" className="relative z-10 mx-auto max-w-6xl px-6 py-10 space-y-6">
 
         {/* General Departments */}
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
@@ -356,7 +383,7 @@ function LandingPage() {
       </section>
 
       {/* Leadership & Team */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10">
+      <section id="team" className="relative z-10 mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 text-center">
           <h2 className="font-display text-3xl md:text-4xl">قيادة الكلية والفريق</h2>
         </div>
@@ -446,6 +473,7 @@ function LandingPage() {
           </div>
 
           {/* انضم إلى فريق Dream Team */}
+          <div id="join" />
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
