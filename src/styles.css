@@ -64,22 +64,22 @@
 
   /* Light mode — glass over the animated sky */
   --background: oklch(0.97 0.008 220 / 0.35);   /* semi-transparent sky-white */
-  --foreground: oklch(0.12 0.05 260);             /* dark indigo text */
+  --foreground: oklch(0.08 0.06 260);             /* darker indigo text */
 
-  --card:             oklch(1 0 0 / 0.55);
-  --card-foreground:  oklch(0.12 0.05 260);
+  --card:             oklch(1 0 0 / 0.65);
+  --card-foreground:  oklch(0.08 0.06 260);
 
-  --popover:            oklch(0.98 0.005 220 / 0.92);
-  --popover-foreground: oklch(0.12 0.05 260);
+  --popover:            oklch(0.98 0.005 220 / 0.95);
+  --popover-foreground: oklch(0.08 0.06 260);
 
-  --primary:            oklch(0.18 0.07 265);
+  --primary:            oklch(0.15 0.08 265);
   --primary-foreground: oklch(0.97 0.005 200);
 
-  --secondary:            oklch(0.92 0.02 230 / 0.6);
-  --secondary-foreground: oklch(0.18 0.07 265);
+  --secondary:            oklch(0.92 0.02 230 / 0.7);
+  --secondary-foreground: oklch(0.15 0.08 265);
 
-  --muted:            oklch(0.90 0.015 225 / 0.55);
-  --muted-foreground: oklch(0.42 0.05 250);
+  --muted:            oklch(0.90 0.015 225 / 0.65);
+  --muted-foreground: oklch(0.28 0.06 250);   /* much darker — was 0.42 */
 
   --accent:            var(--gold);
   --accent-foreground: oklch(0.12 0.04 80);
@@ -182,12 +182,12 @@
 
 /* Glass card — looks beautiful over the sky */
 @utility cosmic-card {
-  background-color: color-mix(in oklch, var(--card) 88%, transparent);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid color-mix(in oklch, white 32%, var(--border));
+  background-color: color-mix(in oklch, var(--card) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid color-mix(in oklch, white 40%, var(--border));
   box-shadow: var(--shadow-soft),
-              inset 0 1px 0 oklch(1 0 0 / 0.18);
+              inset 0 1px 0 oklch(1 0 0 / 0.22);
 }
 
 /* ── Animations ── */
