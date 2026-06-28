@@ -522,8 +522,8 @@ function ApplicationsTab() {
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-foreground/70">
-                <div><span className="text-foreground/40">الإيميل: </span>{app.email}</div>
-                <div><span className="text-foreground/40">الموبايل: </span>{app.phone}</div>
+                <div><span className="text-foreground/40">الرقم الأكاديمي: </span>{app.email}</div>
+                <div><span className="text-foreground/40">الواتساب: </span>{app.phone}</div>
                 <div><span className="text-foreground/40">السنة: </span>{app.academic_year}</div>
                 <div><span className="text-foreground/40">التاريخ: </span>{new Date(app.created_at).toLocaleDateString("ar-EG")}</div>
               </div>
