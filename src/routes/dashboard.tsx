@@ -121,7 +121,7 @@ function Dashboard() {
             <Logo size={40} />
             <div className="hidden sm:block">
               <div className="font-display text-base font-semibold leading-tight">Assuit SciDream</div>
-              <div className="text-[10px] text-muted-foreground">Dream Team</div>
+              <div className="text-[10px] text-foreground/75">Dream Team</div>
             </div>
           </Link>
           <div className="flex items-center gap-3">
@@ -151,7 +151,7 @@ function Dashboard() {
           <h1 className="mt-2 font-display text-3xl md:text-4xl">
             {profile?.full_name?.split(" ")[0] ?? "يا أدمن"} ✨
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-foreground/75">
             رحلتك في كلية العلوم بدأت — اختار قسم وابدأ.
           </p>
         </div>
@@ -197,7 +197,7 @@ function Dashboard() {
                 className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition ${
                   activeTab === tab.key
                     ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
-                    : "border border-border bg-background/40 text-muted-foreground hover:border-accent"
+                    : "border border-border bg-background/40 text-foreground/75 hover:border-accent"
                 }`}
               >
                 <tab.icon className="h-3.5 w-3.5" />
@@ -221,7 +221,7 @@ function Dashboard() {
                 {currentData.map((row) => (
                   <tr key={row.id} className="hover:bg-card/60 transition">
                     <td className="px-4 py-3 font-bold text-accent">{row.id}</td>
-                    <td className="px-4 py-3 font-medium text-foreground/80">{row.location}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">{row.location}</td>
                   </tr>
                 ))}
               </tbody>
