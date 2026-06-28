@@ -171,25 +171,12 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
     <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden
       style={{ background: skyGrad, zIndex: 0 }}>
 
-      {/* SVG layer — stars, sun, moon, planets, glows */}
+      {/* SVG layer — stars, planets, horizon glows (preserveAspectRatio:none OK for these) */}
       <svg width="100%" height="100%" viewBox="0 0 100 100"
         preserveAspectRatio="none" style={{ position:"absolute", inset:0 }}>
         <defs>
-          <radialGradient id="csbg_sg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor={c.sunCol} stopOpacity="1"/>
-            <stop offset="45%"  stopColor={c.sunCol} stopOpacity="0.55"/>
-            <stop offset="100%" stopColor={c.sunCol} stopOpacity="0"/>
-          </radialGradient>
-          <radialGradient id="csbg_mg" cx="35%" cy="35%" r="65%">
-            <stop offset="0%"   stopColor="#f0eaff" stopOpacity="1"/>
-            <stop offset="100%" stopColor="#b0a8d8" stopOpacity="0.8"/>
-          </radialGradient>
           <filter id="csbg_blur1"><feGaussianBlur stdDeviation="0.6"/></filter>
           <filter id="csbg_blur2"><feGaussianBlur stdDeviation="1.2"/></filter>
-          <filter id="csbg_glow">
-            <feGaussianBlur stdDeviation="1.0" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
           <linearGradient id="csbg_haze" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%"   stopColor={c.sky[4]} stopOpacity="0"/>
             <stop offset="100%" stopColor={c.sky[4]} stopOpacity="0.6"/>
@@ -211,24 +198,58 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
           <circle cx={88} cy={55} r={0.7} fill="#1a3828"/>
         </g>
 
-        {/* Sun halo + body */}
-        <ellipse cx={sunX} cy={sunY} rx={10} ry={9}
-          fill="url(#csbg_sg)" opacity={0.55} filter="url(#csbg_blur2)"/>
-        <circle cx={sunX} cy={sunY} r={3.8}
-          fill={c.sunCol} opacity={0.96} filter="url(#csbg_glow)"/>
-        <circle cx={sunX} cy={sunY} r={2.2} fill="white" opacity={0.4}/>
-
-        {/* Moon */}
-        <g opacity={c.moonOp}>
-          <circle cx={moonX} cy={moonY} r={2.8} fill="url(#csbg_mg)" filter="url(#csbg_glow)"/>
-          <circle cx={moonX + 1.1} cy={moonY - 0.4} r={2.2} fill={c.sky[1]} opacity={0.9}/>
-        </g>
-
         {/* Horizon glow */}
         <ellipse cx={50} cy={100} rx={65} ry={22}
           fill={c.horizonGlow} filter="url(#csbg_blur2)"/>
         <rect x={0} y={72} width={100} height={28}
           fill="url(#csbg_haze)" opacity={0.35} filter="url(#csbg_blur1)"/>
+      </svg>
+
+      {/* Sun — own SVG so it's never stretched by preserveAspectRatio:none */}
+      <svg width={120} height={120} style={{
+        position:"absolute",
+        left:`${sunX}%`, top:`${sunY}%`,
+        transform:"translate(-50%,-50%)",
+        overflow:"visible",
+        pointerEvents:"none",
+      }}>
+        <defs>
+          <radialGradient id="csbg_sg2" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stopColor={c.sunCol} stopOpacity="1"/>
+            <stop offset="45%"  stopColor={c.sunCol} stopOpacity="0.55"/>
+            <stop offset="100%" stopColor={c.sunCol} stopOpacity="0"/>
+          </radialGradient>
+          <filter id="csbg_sglow">
+            <feGaussianBlur stdDeviation="5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <circle cx={60} cy={60} r={48} fill="url(#csbg_sg2)" opacity={0.55}/>
+        <circle cx={60} cy={60} r={20} fill={c.sunCol} opacity={0.96} filter="url(#csbg_sglow)"/>
+        <circle cx={60} cy={60} r={11} fill="white" opacity={0.4}/>
+      </svg>
+
+      {/* Moon — own SVG so it's never stretched */}
+      <svg width={80} height={80} style={{
+        position:"absolute",
+        left:`${moonX}%`, top:`${moonY}%`,
+        transform:"translate(-50%,-50%)",
+        overflow:"visible",
+        opacity: c.moonOp,
+        pointerEvents:"none",
+      }}>
+        <defs>
+          <radialGradient id="csbg_mg2" cx="35%" cy="35%" r="65%">
+            <stop offset="0%"   stopColor="#f0eaff" stopOpacity="1"/>
+            <stop offset="100%" stopColor="#b0a8d8" stopOpacity="0.8"/>
+          </radialGradient>
+          <filter id="csbg_mglow">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <circle cx={40} cy={40} r={24} fill="url(#csbg_mg2)" filter="url(#csbg_mglow)"/>
+        <circle cx={50} cy={36} r={18} fill={c.sky[1]} opacity={0.88}/>
       </svg>
 
       {/* Clouds */}
