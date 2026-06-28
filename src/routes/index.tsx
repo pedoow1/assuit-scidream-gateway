@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe } from "lucide-react";
 import { CosmicBackground } from "@/components/CosmicBackground";
@@ -351,6 +352,7 @@ function LandingPage() {
             {[
               { name: "أ.د أبو بكر محمد الطيب", role: "عميد الكلية", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0021.jpg" },
               { name: "أ.د محمد أبو العيون", role: "وكيل الكلية لشئون تعليم الطلاب", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0022.jpg" },
+              { name: "أ.د فاطمة الزهراء عبدالحميد", role: "المشرفة الأكاديمية على الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260628-WA0034.jpg" },
             ].map((p) => (
               <motion.div
                 key={p.name}
@@ -483,6 +485,173 @@ function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Fortune Cookie Bubble */}
+      <Fortunecookie />
     </div>
+  );
+}
+
+const MESSAGES = [
+  "علوم مش بس كتب ومحاضرات — علوم هي الطريقة اللي بتشوف بيها العالم 🔬",
+  "كل معادلة بتحلها دلوقتي هي خطوة نحو مستقبل أكبر منك ✨",
+  "إحنا كنا في نفس المكان اللي أنت فيه — والطريق صعب، بس يستاهل 💪",
+  "أصعب يوم في الكلية هيبقى قصة بتحكيها بفخر بعد سنين 🌙",
+  "العالِم مش اللي عنده كل الإجابات — العالِم اللي مش بيوقف عن السؤال 🧠",
+  "التعب اللي بتحس بيه دلوقتي هو ثمن الفخر اللي جاي 🌟",
+  "ذاكر، اتعب، اصبر — وفجأة هتلاقي إن الصعب بقى سهل 🎯",
+  "كلية العلوم بتصنع ناس بتفكر — وده أغلى من أي شهادة 🏆",
+  "أنت مش بس طالب علوم — أنت عالم في طور التكوين 🌱",
+];
+
+function Fortunecookie() {
+  const [broken, setBroken] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [msgIndex] = useState(() => Math.floor(Math.random() * MESSAGES.length));
+  const [showMsg, setShowMsg] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  function handleBreak() {
+    if (broken) return;
+    setBroken(true);
+    setTimeout(() => setShowMsg(true), 600);
+  }
+
+  function handleClose() {
+    setClosing(true);
+    setTimeout(() => setVisible(false), 500);
+  }
+
+  if (!visible) return null;
+
+  return (
+    <>
+      {/* Floating bubble */}
+      {!showMsg && (
+        <button
+          onClick={handleBreak}
+          dir="rtl"
+          style={{
+            position: "fixed",
+            bottom: "28px",
+            right: "20px",
+            zIndex: 9999,
+            background: "none",
+            border: "none",
+            cursor: broken ? "default" : "pointer",
+            padding: 0,
+          }}
+        >
+          <motion.div
+            animate={broken ? { scale: [1, 1.3, 0], rotate: [0, 15, -15, 0], opacity: [1, 1, 0] } : { y: [0, -10, 0] }}
+            transition={broken ? { duration: 0.6, ease: "easeInOut" } : { duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #f5c842 0%, #e8a020 50%, #f5c842 100%)",
+              boxShadow: "0 4px 24px rgba(245,200,66,0.45), 0 0 0 3px rgba(245,200,66,0.15)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 30,
+              userSelect: "none",
+            }}
+          >
+            🥠
+          </motion.div>
+          {!broken && (
+            <motion.div
+              animate={{ opacity: [0.6, 1, 0.6], y: [0, -4, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{
+                position: "absolute",
+                bottom: 70,
+                right: 0,
+                background: "rgba(30,20,10,0.85)",
+                color: "#f5c842",
+                fontSize: 11,
+                borderRadius: 12,
+                padding: "4px 10px",
+                whiteSpace: "nowrap",
+                fontWeight: 600,
+                backdropFilter: "blur(8px)",
+                pointerEvents: "none",
+              }}
+            >
+              اكسرني! 🤫
+            </motion.div>
+          )}
+        </button>
+      )}
+
+      {/* Message overlay */}
+      {showMsg && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={closing ? { opacity: 0 } : { opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(6px)",
+            padding: 24,
+          }}
+          onClick={handleClose}
+        >
+          <motion.div
+            initial={{ scale: 0.4, opacity: 0, rotate: -8 }}
+            animate={closing ? { scale: 0.3, opacity: 0, rotate: 8 } : { scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(135deg, #fffbe8 0%, #fff3c4 100%)",
+              borderRadius: 28,
+              padding: "36px 32px 28px",
+              maxWidth: 360,
+              width: "100%",
+              boxShadow: "0 24px 80px rgba(245,200,66,0.25), 0 4px 24px rgba(0,0,0,0.15)",
+              textAlign: "center",
+              position: "relative",
+              border: "2px solid rgba(245,200,66,0.4)",
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🥠</div>
+            <div style={{ fontSize: 13, color: "#b8860b", fontWeight: 700, letterSpacing: 2, marginBottom: 16, textTransform: "uppercase" }}>
+              رسالة لك من Dream Team
+            </div>
+            <p style={{ fontSize: 17, color: "#3d2800", lineHeight: 1.75, fontWeight: 600, margin: 0 }}>
+              {MESSAGES[msgIndex]}
+            </p>
+            <p style={{ fontSize: 12, color: "#a07830", marginTop: 20, marginBottom: 0 }}>
+              إحنا كنا مكانك — وبنؤمن فيك 💛
+            </p>
+            <button
+              onClick={handleClose}
+              style={{
+                marginTop: 24,
+                background: "linear-gradient(135deg, #f5c842, #e8a020)",
+                border: "none",
+                borderRadius: 50,
+                padding: "10px 32px",
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#3d2800",
+                cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(245,200,66,0.4)",
+              }}
+            >
+              شكراً 🌟
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </>
   );
 }
