@@ -210,18 +210,18 @@ function Dashboard() {
           <div className="overflow-x-auto rounded-2xl border border-border/60">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-card/60 text-muted-foreground text-xs uppercase tracking-wider">
-                  <th className="px-4 py-3 text-right font-semibold">
+                <tr className="border-b border-border bg-card/80 text-foreground text-xs uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right font-bold">
                     {activeTab === "auditoriums" ? "المدرج" : activeTab === "classrooms" ? "الفصل" : "المعمل"}
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold">الموقع</th>
+                  <th className="px-4 py-3 text-right font-bold">الموقع</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {currentData.map((row) => (
-                  <tr key={row.id} className="hover:bg-card/40 transition">
-                    <td className="px-4 py-3 font-semibold text-accent">{row.id}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.location}</td>
+                  <tr key={row.id} className="hover:bg-card/60 transition">
+                    <td className="px-4 py-3 font-bold text-accent">{row.id}</td>
+                    <td className="px-4 py-3 font-medium text-foreground/80">{row.location}</td>
                   </tr>
                 ))}
               </tbody>
