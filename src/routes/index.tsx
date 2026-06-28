@@ -319,11 +319,11 @@ function LandingPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-center">
               <thead>
-                <tr className="border-b border-border text-muted-foreground text-xs uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">التقدير</th>
-                  <th className="pb-3 font-semibold">الرمز</th>
-                  <th className="pb-3 font-semibold">النقاط</th>
-                  <th className="pb-3 font-semibold">النسبة المئوية</th>
+                <tr className="border-b border-border text-foreground/70 text-xs uppercase tracking-wider">
+                  <th className="pb-3 font-bold">التقدير</th>
+                  <th className="pb-3 font-bold">الرمز</th>
+                  <th className="pb-3 font-bold">النقاط</th>
+                  <th className="pb-3 font-bold">النسبة المئوية</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -341,10 +341,10 @@ function LandingPage() {
                   { grade: "راسب", symbol: "F", points: "0", range: "< 50%" },
                 ].map((row) => (
                   <tr key={row.symbol} className="text-xs hover:bg-card/40 transition">
-                    <td className="py-2 font-medium">{row.grade}</td>
+                    <td className="py-2 font-semibold text-foreground">{row.grade}</td>
                     <td className="py-2 font-bold text-accent">{row.symbol}</td>
-                    <td className="py-2">{row.points}</td>
-                    <td className="py-2 text-muted-foreground">{row.range}</td>
+                    <td className="py-2 font-medium text-foreground/80">{row.points}</td>
+                    <td className="py-2 font-medium text-foreground/70">{row.range}</td>
                   </tr>
                 ))}
               </tbody>
