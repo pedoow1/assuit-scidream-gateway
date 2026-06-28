@@ -64,11 +64,11 @@ function LandingPage() {
           <Logo size={44} />
           <div className="hidden sm:block">
             <div className="font-display text-lg font-semibold leading-tight">Assuit SciDream</div>
-            <div className="text-[11px] text-muted-foreground">Dream Team · Faculty of Science</div>
+            <div className="text-[11px] text-foreground/75">Dream Team · Faculty of Science</div>
           </div>
         </div>
         <nav className="flex items-center gap-3">
-          <Link to="/auth" className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">تسجيل الدخول</Link>
+          <Link to="/auth" className="hidden text-sm text-foreground/75 hover:text-foreground sm:inline">تسجيل الدخول</Link>
           <Link
             to="/auth"
             className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:shadow-glow"
@@ -103,7 +103,7 @@ function LandingPage() {
           <h1 className="font-display text-5xl leading-tight sm:text-6xl md:text-7xl">
             كلية العلوم <span className="text-gradient-cosmic">جامعة أسيوط</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-foreground/75">
             تأسست في <span className="font-semibold text-foreground">أكتوبر 1957</span> — من أعرق كليات العلوم في صعيد مصر.
           </p>
 
@@ -132,7 +132,7 @@ function LandingPage() {
                 <Eye className="h-4 w-4" />
                 رؤية الكلية
               </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-foreground/75">
                 كلية العلوم جامعة أسيوط كلية متميزة على المستوى القومي تمد المجتمع بخريجين مؤهلين قادرين على الإبداع والابتكار. وتتميز بإجراء أبحاث عالية الجودة التي تقابل الاحتياجات التكنولوجية والعلمية والصناعية والحكومية والمجتمعية.
               </p>
             </div>
@@ -141,7 +141,7 @@ function LandingPage() {
                 <Target className="h-4 w-4" />
                 رسالة الكلية
               </div>
-              <ul className="text-sm leading-relaxed text-muted-foreground space-y-2">
+              <ul className="text-sm leading-relaxed text-foreground/75 space-y-2">
                 <li>• مؤسسة للتعليم العالي والبحث العلمي في مجالات العلوم الأساسية.</li>
                 <li>• إعداد أجيال من العلماء والعاملين بالمراكز العلمية والبحثية والتعليمية.</li>
                 <li>• المساهمة في تقدم العلوم الرياضية وعلوم الحاسب والفيزيائية والكيميائية والبيولوجية.</li>
@@ -170,7 +170,7 @@ function LandingPage() {
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-cosmic text-primary-foreground">
                 <g.icon className="h-4 w-4" />
               </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">{g.text}</p>
+              <p className="text-sm leading-relaxed text-foreground/75">{g.text}</p>
             </motion.div>
           ))}
         </div>
@@ -206,7 +206,7 @@ function LandingPage() {
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="mb-6 text-center">
             <h2 className="font-display text-3xl">الأقسام المميزة ⭐</h2>
-            <p className="mt-2 text-sm text-muted-foreground">أقسام متخصصة داخل الكلية</p>
+            <p className="mt-2 text-sm text-foreground/75">أقسام متخصصة داخل الكلية</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[
@@ -239,7 +239,7 @@ function LandingPage() {
               <GraduationCap className="h-5 w-5 text-accent" />
               <h3 className="font-display text-xl">درجة البكالوريوس — التخصص المنفرد</h3>
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">138 ساعة معتمدة على الأقل — مادة (7) و(8) من اللائحة</p>
+            <p className="mb-3 text-xs text-foreground/75">138 ساعة معتمدة على الأقل — مادة (7) و(8) من اللائحة</p>
             <div className="grid grid-cols-2 gap-2">
               {DEGREES_SINGLE.map((d) => (
                 <div key={d} className="flex items-center gap-1.5 rounded-lg bg-background/40 border border-border/50 px-2 py-1.5">
@@ -255,7 +255,7 @@ function LandingPage() {
               <Sparkles className="h-5 w-5 text-accent" />
               <h3 className="font-display text-xl">درجة البكالوريوس — التخصص المزدوج</h3>
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">39 ساعة لكل فرع + 21 ساعة مشتركة — مادة (8) ب</p>
+            <p className="mb-3 text-xs text-foreground/75">39 ساعة لكل فرع + 21 ساعة مشتركة — مادة (8) ب</p>
             <div className="grid gap-2">
               {DEGREES_DOUBLE.map((d) => (
                 <div key={d} className="flex items-center gap-1.5 rounded-lg bg-background/40 border border-border/50 px-2 py-1.5">
@@ -265,7 +265,7 @@ function LandingPage() {
               ))}
             </div>
             <div className="mt-4 rounded-lg bg-card/60 border border-border/50 p-3">
-              <p className="text-xs text-muted-foreground">كما تمنح الجامعة: <span className="text-foreground font-medium">دبلوم الدراسات العليا · الماجستير · دكتوراه الفلسفة · الدكتوراه في العلوم</span></p>
+              <p className="text-xs text-foreground/75">كما تمنح الجامعة: <span className="text-foreground font-medium">دبلوم الدراسات العليا · الماجستير · دكتوراه الفلسفة · الدكتوراه في العلوم</span></p>
             </div>
           </div>
         </div>
@@ -276,7 +276,7 @@ function LandingPage() {
         <div className="cosmic-card rounded-3xl p-8 md:p-10">
           <div className="mb-6 text-center">
             <h2 className="font-display text-3xl">نظام الساعات المعتمدة</h2>
-            <p className="mt-2 text-sm text-muted-foreground">المواد من (3) إلى (18) من اللائحة الداخلية</p>
+            <p className="mt-2 text-sm text-foreground/75">المواد من (3) إلى (18) من اللائحة الداخلية</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -288,7 +288,7 @@ function LandingPage() {
               <div key={s.title} className="rounded-2xl border border-border bg-background/40 p-5 text-center">
                 <div className="text-2xl font-display font-bold text-gradient-cosmic">{s.value}</div>
                 <div className="mt-1 text-sm font-semibold">{s.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{s.sub}</div>
+                <div className="mt-1 text-xs text-foreground/75">{s.sub}</div>
               </div>
             ))}
           </div>
@@ -296,15 +296,15 @@ function LandingPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-background/30 p-4">
               <div className="text-xs font-semibold text-accent mb-2">متطلبات الجامعة</div>
-              <p className="text-xs text-muted-foreground">8 ساعات معتمدة: 4 إجبارية (إنجليزي + حقوق الإنسان) + 4 اختيارية من مقررات الثقافة العامة.</p>
+              <p className="text-xs text-foreground/75">8 ساعات معتمدة: 4 إجبارية (إنجليزي + حقوق الإنسان) + 4 اختيارية من مقررات الثقافة العامة.</p>
             </div>
             <div className="rounded-xl border border-border bg-background/30 p-4">
               <div className="text-xs font-semibold text-accent mb-2">متطلبات الكلية</div>
-              <p className="text-xs text-muted-foreground">31 ساعة معتمدة إجبارية تشمل: رياضيات، فيزياء، كيمياء، جيولوجيا، حيوان، نبات، حاسب آلي، وأخلاقيات المهنة.</p>
+              <p className="text-xs text-foreground/75">31 ساعة معتمدة إجبارية تشمل: رياضيات، فيزياء، كيمياء، جيولوجيا، حيوان، نبات، حاسب آلي، وأخلاقيات المهنة.</p>
             </div>
             <div className="rounded-xl border border-border bg-background/30 p-4">
               <div className="text-xs font-semibold text-accent mb-2">التدريب الصيفي</div>
-              <p className="text-xs text-muted-foreground">6 أسابيع في المجالات التطبيقية قبل التخرج — بعد إنجاز 90 ساعة معتمدة على الأقل.</p>
+              <p className="text-xs text-foreground/75">6 أسابيع في المجالات التطبيقية قبل التخرج — بعد إنجاز 90 ساعة معتمدة على الأقل.</p>
             </div>
           </div>
         </div>
@@ -319,7 +319,7 @@ function LandingPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-center">
               <thead>
-                <tr className="border-b border-border text-foreground/70 text-xs uppercase tracking-wider">
+                <tr className="border-b border-border text-foreground/85 text-xs uppercase tracking-wider">
                   <th className="pb-3 font-bold">التقدير</th>
                   <th className="pb-3 font-bold">الرمز</th>
                   <th className="pb-3 font-bold">النقاط</th>
@@ -343,8 +343,8 @@ function LandingPage() {
                   <tr key={row.symbol} className="text-xs hover:bg-card/40 transition">
                     <td className="py-2 font-semibold text-foreground">{row.grade}</td>
                     <td className="py-2 font-bold text-accent">{row.symbol}</td>
-                    <td className="py-2 font-medium text-foreground/80">{row.points}</td>
-                    <td className="py-2 font-medium text-foreground/70">{row.range}</td>
+                    <td className="py-2 font-medium text-foreground">{row.points}</td>
+                    <td className="py-2 font-medium text-foreground/85">{row.range}</td>
                   </tr>
                 ))}
               </tbody>
@@ -382,7 +382,7 @@ function LandingPage() {
                 />
                 <div>
                   <div className="font-display text-lg leading-tight">{p.name}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{p.role}</div>
+                  <div className="mt-1 text-sm text-foreground/75">{p.role}</div>
                 </div>
               </motion.div>
             ))}
@@ -395,7 +395,7 @@ function LandingPage() {
             viewport={{ once: true }}
             className="cosmic-card rounded-2xl p-5 mt-5 text-center"
           >
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-foreground/75 leading-relaxed">
               نتقدم بخالص الشكر والتقدير لقيادة كلية العلوم على دعمهم المستمر للأنشطة الطلابية وحرصهم على توفير بيئة أكاديمية محفزة تُنمي مهارات الطلاب وتدعم إبداعهم.
             </p>
           </motion.div>
@@ -438,7 +438,7 @@ function LandingPage() {
                     <div className="mt-0.5 text-sm text-accent font-medium">{p.role}</div>
                   </div>
                 </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">{p.bio}</p>
+                <p className="text-xs leading-relaxed text-foreground/75">{p.bio}</p>
               </motion.div>
             ))}
           </div>
@@ -451,12 +451,12 @@ function LandingPage() {
             className="cosmic-card rounded-2xl p-6 mt-6 text-center"
           >
             <h3 className="font-display text-xl mb-3">Dream Team – كلية العلوم</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-foreground/75 leading-relaxed">
               <strong className="text-foreground">Dream Team</strong> أسرة طلابية في كلية العلوم — جامعة أسيوط، تسعى إلى بناء بيئة جامعية قائمة على التعاون والإبداع والتطوير المستمر.
               {" "}ندعم الطلاب من خلال الأنشطة العلمية والثقافية والرياضية والاجتماعية، ونوفر لهم فرصاً حقيقية لاكتساب مهارات جديدة وتنمية روح القيادة والعمل الجماعي.
             </p>
             <p className="mt-4 font-semibold text-accent italic">We Dream. We Explore. We Discover.</p>
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-foreground/75">
               لأننا نؤمن أن كل طالب يملك القدرة على تحقيق طموحه وترك بصمة حقيقية داخل الكلية وخارجها.
             </p>
           </motion.div>
@@ -486,7 +486,7 @@ function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-border/60 bg-background/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-xs text-muted-foreground sm:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-xs text-foreground/75 sm:flex-row">
           <div className="flex items-center gap-2">
             <Logo size={28} />
             <span className="font-display text-sm">Dream Team · Faculty of Science</span>
