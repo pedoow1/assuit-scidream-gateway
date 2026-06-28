@@ -52,30 +52,30 @@
 :root {
   --radius: 0.875rem;
 
-  /* Brand palette extracted from the Dream Team logo */
-  --cream: oklch(0.972 0.012 75);          /* #FAF7F4 warm cream */
-  --ink: oklch(0.16 0.02 280);             /* deep black with cosmic blue */
-  --gold: oklch(0.74 0.12 75);             /* #D4A853 warm gold */
-  --rose: oklch(0.78 0.085 12);            /* #E8A0B0 rose pink */
-  --cosmic: oklch(0.32 0.08 285);          /* deep galaxy */
+  /* Forest palette — Dream Team */
+  --cream: oklch(0.968 0.01 105);           /* warm parchment */
+  --ink: oklch(0.18 0.04 145);              /* deep forest green-black */
+  --gold: oklch(0.74 0.12 75);              /* #D4A853 warm gold — kept */
+  --rose: oklch(0.72 0.08 150);             /* forest green accent */
+  --cosmic: oklch(0.30 0.07 150);           /* deep forest */
 
   --background: var(--cream);
   --foreground: var(--ink);
 
-  --card: oklch(1 0 0);
+  --card: oklch(0.99 0.006 100);
   --card-foreground: var(--ink);
 
-  --popover: oklch(0.985 0.008 75);
+  --popover: oklch(0.985 0.008 100);
   --popover-foreground: var(--ink);
 
   --primary: var(--ink);
   --primary-foreground: var(--cream);
 
-  --secondary: oklch(0.94 0.018 75);
+  --secondary: oklch(0.93 0.02 130);
   --secondary-foreground: var(--ink);
 
-  --muted: oklch(0.93 0.014 75);
-  --muted-foreground: oklch(0.45 0.025 280);
+  --muted: oklch(0.92 0.016 120);
+  --muted-foreground: oklch(0.42 0.04 145);
 
   --accent: var(--gold);
   --accent-foreground: var(--ink);
@@ -83,37 +83,37 @@
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.88 0.018 75);
-  --input: oklch(0.9 0.014 75);
+  --border: oklch(0.86 0.022 120);
+  --input: oklch(0.90 0.016 115);
   --ring: var(--gold);
 
-  /* Gradients */
-  --gradient-cosmic: linear-gradient(135deg, oklch(0.78 0.085 12) 0%, oklch(0.74 0.12 75) 50%, oklch(0.32 0.08 285) 100%);
-  --gradient-aurora: linear-gradient(120deg, color-mix(in oklch, var(--rose) 30%, transparent), color-mix(in oklch, var(--gold) 25%, transparent));
-  --gradient-trail: radial-gradient(ellipse at top right, color-mix(in oklch, var(--rose) 25%, transparent), transparent 60%),
-                    radial-gradient(ellipse at bottom left, color-mix(in oklch, var(--gold) 22%, transparent), transparent 55%);
+  /* Gradients — forest */
+  --gradient-cosmic: linear-gradient(135deg, oklch(0.72 0.08 150) 0%, oklch(0.74 0.12 75) 50%, oklch(0.30 0.07 150) 100%);
+  --gradient-aurora: linear-gradient(120deg, color-mix(in oklch, var(--rose) 25%, transparent), color-mix(in oklch, var(--gold) 22%, transparent));
+  --gradient-trail: radial-gradient(ellipse at top right, rgba(180,210,160,0.18), transparent 60%),
+                    radial-gradient(ellipse at bottom left, rgba(212,168,83,0.15), transparent 55%);
 
   /* Shadows */
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.04), 0 8px 24px -8px oklch(0.16 0.02 280 / 0.12);
-  --shadow-glow: 0 0 40px -8px color-mix(in oklch, var(--gold) 50%, transparent);
-  --shadow-rose: 0 0 60px -16px color-mix(in oklch, var(--rose) 60%, transparent);
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.05), 0 8px 24px -8px oklch(0.18 0.04 145 / 0.14);
+  --shadow-glow: 0 0 40px -8px color-mix(in oklch, var(--gold) 45%, transparent);
+  --shadow-rose: 0 0 60px -16px color-mix(in oklch, var(--rose) 50%, transparent);
 }
 
 .dark {
-  --background: oklch(0.14 0.025 285);
-  --foreground: oklch(0.96 0.008 75);
-  --card: oklch(0.19 0.03 285);
-  --card-foreground: oklch(0.96 0.008 75);
-  --popover: oklch(0.19 0.03 285);
-  --popover-foreground: oklch(0.96 0.008 75);
-  --primary: oklch(0.96 0.008 75);
-  --primary-foreground: oklch(0.14 0.025 285);
-  --secondary: oklch(0.24 0.035 285);
-  --secondary-foreground: oklch(0.96 0.008 75);
-  --muted: oklch(0.22 0.03 285);
-  --muted-foreground: oklch(0.72 0.025 75);
+  --background: oklch(0.14 0.03 145);
+  --foreground: oklch(0.95 0.01 100);
+  --card: oklch(0.18 0.035 145);
+  --card-foreground: oklch(0.95 0.01 100);
+  --popover: oklch(0.18 0.035 145);
+  --popover-foreground: oklch(0.95 0.01 100);
+  --primary: oklch(0.95 0.01 100);
+  --primary-foreground: oklch(0.14 0.03 145);
+  --secondary: oklch(0.23 0.04 145);
+  --secondary-foreground: oklch(0.95 0.01 100);
+  --muted: oklch(0.21 0.033 145);
+  --muted-foreground: oklch(0.70 0.03 100);
   --accent: var(--gold);
-  --accent-foreground: oklch(0.14 0.025 285);
+  --accent-foreground: oklch(0.14 0.03 145);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
   --ring: var(--gold);
