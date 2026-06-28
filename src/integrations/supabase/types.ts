@@ -403,6 +403,45 @@ export type Database = {
         }
         Relationships: []
       }
+      committee_applications: {
+        Row: {
+          id: string
+          created_at: string
+          full_name: string
+          email: string
+          phone: string
+          academic_year: string
+          committee: string
+          why_join: string
+          skills: string | null
+          status: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          full_name: string
+          email: string
+          phone: string
+          academic_year: string
+          committee: string
+          why_join: string
+          skills?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          full_name?: string
+          email?: string
+          phone?: string
+          academic_year?: string
+          committee?: string
+          why_join?: string
+          skills?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
