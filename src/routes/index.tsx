@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe } from "lucide-react";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -40,9 +40,79 @@ const GOALS = [
 ];
 
 function LandingPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+  const cloudsY = useTransform(scrollYProgress, [0, 1], ["0%", "-30%"]);
+  const treesY = useTransform(scrollYProgress, [0, 1], ["0%", "12%"]);
+  const fogY = useTransform(scrollYProgress, [0, 1], ["0%", "-15%"]);
+
   return (
-    <div className="relative min-h-screen overflow-hidden" dir="rtl">
-      <CosmicBackground density={50} />
+    <div ref={containerRef} className="relative min-h-screen overflow-hidden" dir="rtl">
+      {/* Parallax forest background */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+        {/* Sky */}
+        <div className="absolute inset-0" style={{
+          background: "linear-gradient(180deg, #b8d4b8 0%, #d8ecd8 35%, #eef4ee 65%, #f0ede8 100%)"
+        }} />
+        {/* Sun glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{
+          width: "700px", height: "350px",
+          background: "radial-gradient(ellipse at 50% 0%, rgba(255,220,100,0.3) 0%, transparent 70%)",
+        }} />
+        {/* Clouds parallax */}
+        <motion.div style={{ y: cloudsY }} className="absolute inset-0">
+          <div className="forest-cloud c1" />
+          <div className="forest-cloud c2" />
+          <div className="forest-cloud c3" />
+          <div className="forest-cloud c4" />
+        </motion.div>
+        {/* Fog parallax */}
+        <motion.div style={{ y: fogY }} className="absolute inset-0">
+          <div className="forest-fog f1" />
+          <div className="forest-fog f2" />
+          <div className="forest-fog f3" />
+        </motion.div>
+        {/* Trees parallax */}
+        <motion.div style={{ y: treesY }} className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ width: "100%", height: "240px", display: "block" }}>
+            <path d="M0,280 L40,200 L80,240 L120,180 L160,220 L200,160 L240,210 L280,170 L320,200 L360,150 L400,190 L440,160 L480,200 L520,170 L560,210 L600,155 L640,195 L680,165 L720,205 L760,155 L800,190 L840,160 L880,200 L920,165 L960,195 L1000,155 L1040,190 L1080,160 L1120,200 L1160,165 L1200,190 L1240,155 L1280,185 L1320,165 L1360,195 L1400,170 L1440,200 L1440,320 L0,320 Z" fill="rgba(80,120,70,0.2)" />
+            <path d="M0,300 L60,230 L100,260 L150,200 L190,240 L240,190 L290,230 L340,200 L390,235 L440,195 L490,230 L540,195 L600,230 L660,195 L720,230 L780,195 L840,228 L900,195 L960,228 L1020,192 L1080,226 L1140,195 L1200,226 L1260,195 L1320,225 L1380,200 L1440,230 L1440,320 L0,320 Z" fill="rgba(55,90,50,0.4)" />
+            <path d="M0,320 L30,260 L55,290 L80,250 L110,275 L140,245 L170,270 L200,250 L240,275 L280,248 L320,272 L370,248 L410,272 L460,248 L510,272 L560,248 L610,272 L660,248 L710,272 L760,248 L810,272 L860,248 L910,272 L960,248 L1010,272 L1060,248 L1110,272 L1160,248 L1210,272 L1260,248 L1310,272 L1360,252 L1400,272 L1440,255 L1440,320 Z" fill="rgba(35,65,35,0.75)" />
+          </svg>
+        </motion.div>
+        {/* Green glow */}
+        <div className="absolute -bottom-20 -left-20" style={{
+          width: "400px", height: "400px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(80,130,70,0.18), transparent 70%)",
+          filter: "blur(40px)",
+        }} />
+      </div>
+
+      <style>{`
+        .forest-cloud {
+          position: absolute;
+          border-radius: 60px;
+          background: rgba(255,255,255,0.6);
+          filter: blur(20px);
+          animation: cloudDrift linear infinite;
+        }
+        .c1 { top: 8%; left: -300px; width: 320px; height: 75px; opacity: 0.65; animation-duration: 55s; }
+        .c2 { top: 15%; left: -200px; width: 240px; height: 55px; opacity: 0.5; animation-duration: 72s; animation-delay: -22s; }
+        .c3 { top: 5%; left: -400px; width: 380px; height: 85px; opacity: 0.55; animation-duration: 65s; animation-delay: -38s; }
+        .c4 { top: 20%; left: -280px; width: 200px; height: 48px; opacity: 0.4; animation-duration: 88s; animation-delay: -55s; }
+        @keyframes cloudDrift { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 600px)); } }
+        .forest-fog {
+          position: absolute;
+          left: -20%; width: 140%;
+          border-radius: 50%;
+          filter: blur(45px);
+          animation: fogFloat ease-in-out infinite;
+        }
+        .f1 { top: 25%; height: 85px; background: rgba(215,232,215,0.32); animation-duration: 28s; }
+        .f2 { top: 50%; height: 65px; background: rgba(205,225,205,0.26); animation-duration: 42s; animation-direction: reverse; }
+        .f3 { top: 68%; height: 95px; background: rgba(195,218,195,0.2); animation-duration: 36s; animation-delay: -10s; }
+        @keyframes fogFloat { 0%,100% { transform: translateX(0) scaleX(1); } 50% { transform: translateX(5%) scaleX(1.04); } }
+      `}</style>
 
       {/* Nav */}
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
