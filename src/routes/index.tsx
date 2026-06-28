@@ -141,7 +141,7 @@ function LandingPage() {
               href={item.href}
               className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-medium transition hover:scale-105 ${
                 item.href === "#join"
-                  ? "border-accent/60 bg-accent/10 text-accent hover:bg-accent/20"
+                  ? "border-transparent bg-gradient-cosmic text-primary-foreground shadow-soft hover:shadow-glow"
                   : "border-border bg-card/50 text-foreground/75 hover:text-foreground hover:bg-card/80"
               }`}
             >
