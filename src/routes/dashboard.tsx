@@ -65,7 +65,18 @@ function Dashboard() {
   const { user, profile, roles, loading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"auditoriums" | "classrooms" | "labs">("auditoriums");
+  const [scrollProgress, setScrollProgress] = useState(0);
   const isOwnerAdmin = user?.email?.trim().toLowerCase() === "abdalahkotp31@gmail.com";
+
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.documentElement;
+      const max = el.scrollHeight - el.clientHeight;
+      setScrollProgress(max > 0 ? Math.min(el.scrollTop / max, 1) : 0);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -102,7 +113,7 @@ function Dashboard() {
 
   return (
     <div className="relative min-h-screen" dir="rtl">
-      <CosmicBackground density={26} />
+      <CosmicBackground scrollProgress={scrollProgress} />
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
