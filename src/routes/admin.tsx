@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2, ClipboardList } from "lucide-react";
 import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "verification" | "admins";
+type Tab = "verification" | "admins" | "applications";
 
 const OWNER_EMAIL = "abdalahkotp31@gmail.com";
 
@@ -68,6 +68,9 @@ function AdminPage() {
           <TabBtn active={tab === "verification"} onClick={() => setTab("verification")}>
             مراجعة الطلاب
           </TabBtn>
+          <TabBtn active={tab === "applications"} onClick={() => setTab("applications")}>
+            طلبات اللجان
+          </TabBtn>
           {isSuper && (
             <TabBtn active={tab === "admins"} onClick={() => setTab("admins")}>
               إدارة الأدمن
@@ -77,6 +80,7 @@ function AdminPage() {
 
         <div className="mt-6">
           {tab === "verification" && <VerificationTab />}
+          {tab === "applications" && <ApplicationsTab />}
           {tab === "admins" && isSuper && <AdminsTab />}
         </div>
       </main>
@@ -409,6 +413,153 @@ function AdminsTab() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Applications tab ---------------- */
+
+type ApplicationRow = {
+  id: string;
+  created_at: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  academic_year: string;
+  committee: string;
+  why_join: string;
+  skills: string | null;
+  status: string;
+};
+
+function ApplicationsTab() {
+  const [apps, setApps] = useState<ApplicationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("الكل");
+
+  const committees = ["الكل", "PR Committee", "Media Committee", "HR Committee", "OC Committee", "AC Committee"];
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("committee_applications")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) toast.error("ما قدرناش نحمل الطلبات");
+    setApps((data ?? []) as ApplicationRow[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = filter === "الكل" ? apps : apps.filter((a) => a.committee === filter);
+
+  const handleStatus = async (id: string, status: string) => {
+    const { error } = await supabase
+      .from("committee_applications")
+      .update({ status })
+      .eq("id", id);
+    if (error) toast.error("حصل خطأ");
+    else {
+      toast.success(status === "accepted" ? "تم القبول ✅" : "تم الرفض");
+      load();
+    }
+  };
+
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <ClipboardList className="h-5 w-5 text-accent" />
+        <h2 className="font-display text-lg">طلبات الانضمام للجان ({apps.length})</h2>
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-2 flex-wrap mb-6">
+        {committees.map((c) => (
+          <button
+            key={c}
+            onClick={() => setFilter(c)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition ${
+              filter === c
+                ? "bg-accent text-background border-accent"
+                : "border-border text-foreground/70 hover:text-foreground"
+            }`}
+          >
+            {c}
+            {c !== "الكل" && (
+              <span className="ml-1 opacity-60">
+                ({apps.filter((a) => a.committee === c).length})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-foreground/50">لا توجد طلبات بعد</div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((app) => (
+            <div key={app.id} className="cosmic-card rounded-2xl p-5 flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-semibold text-base">{app.full_name}</div>
+                  <div className="text-xs text-accent font-medium mt-0.5">{app.committee}</div>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${
+                  app.status === "accepted" ? "bg-green-500/20 text-green-400" :
+                  app.status === "rejected" ? "bg-red-500/20 text-red-400" :
+                  "bg-foreground/10 text-foreground/60"
+                }`}>
+                  {app.status === "accepted" ? "مقبول ✅" : app.status === "rejected" ? "مرفوض ❌" : "قيد المراجعة"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-foreground/70">
+                <div><span className="text-foreground/40">الإيميل: </span>{app.email}</div>
+                <div><span className="text-foreground/40">الموبايل: </span>{app.phone}</div>
+                <div><span className="text-foreground/40">السنة: </span>{app.academic_year}</div>
+                <div><span className="text-foreground/40">التاريخ: </span>{new Date(app.created_at).toLocaleDateString("ar-EG")}</div>
+              </div>
+
+              <div className="text-xs bg-background/40 rounded-xl p-3">
+                <div className="text-foreground/50 mb-1 font-medium">سبب الانضمام:</div>
+                <p className="text-foreground/80 leading-relaxed">{app.why_join}</p>
+              </div>
+
+              {app.skills && (
+                <div className="text-xs bg-background/40 rounded-xl p-3">
+                  <div className="text-foreground/50 mb-1 font-medium">المهارات:</div>
+                  <p className="text-foreground/80">{app.skills}</p>
+                </div>
+              )}
+
+              {app.status === "pending" && (
+                <div className="flex gap-2 mt-1">
+                  <button
+                    onClick={() => handleStatus(app.id, "accepted")}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 py-2 text-xs font-semibold transition"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> قبول
+                  </button>
+                  <button
+                    onClick={() => handleStatus(app.id, "rejected")}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 py-2 text-xs font-semibold transition"
+                  >
+                    <XCircle className="h-3.5 w-3.5" /> رفض
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
