@@ -47,14 +47,14 @@ function AdminPage() {
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
             <ArrowLeft className="h-4 w-4 rotate-180" /> الرجوع
           </Link>
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-accent" />
             <div>
               <div className="font-display text-base font-semibold leading-tight">لوحة الأدمن</div>
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[10px] text-foreground/75">
                 {isSuper ? "Super Admin · أنت الـ Big Boss" : "Admin"}
               </div>
             </div>
@@ -89,7 +89,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
     <button
       onClick={onClick}
       className={`relative -mb-px px-4 py-2.5 text-sm font-medium transition ${
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        active ? "text-foreground" : "text-foreground/75 hover:text-foreground"
       }`}
     >
       {children}
@@ -162,7 +162,7 @@ function VerificationTab() {
       <div className="cosmic-card rounded-2xl p-12 text-center">
         <div className="text-5xl">✨</div>
         <h3 className="mt-3 font-display text-xl">مفيش طلبات تستنى</h3>
-        <p className="mt-1 text-sm text-muted-foreground">كل الطلاب اتأكدوا — رايق</p>
+        <p className="mt-1 text-sm text-foreground/75">كل الطلاب اتأكدوا — رايق</p>
       </div>
     );
   }
@@ -172,7 +172,7 @@ function VerificationTab() {
       <div className="cosmic-card overflow-hidden rounded-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
-            <thead className="border-b border-border bg-secondary/30 text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="border-b border-border bg-secondary/30 text-xs uppercase tracking-wider text-foreground/75">
               <tr>
                 <th className="px-4 py-3">الاسم</th>
                 <th className="px-4 py-3">الرقم الأكاديمي</th>
@@ -188,7 +188,7 @@ function VerificationTab() {
                   <td className="px-4 py-3 font-medium">{row.full_name}</td>
                   <td className="px-4 py-3 font-mono text-xs">{row.academic_id}</td>
                   <td className="px-4 py-3 font-mono text-xs">{row.phone}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{row.email}</td>
+                  <td className="px-4 py-3 text-xs text-foreground/75">{row.email}</td>
                   <td className="px-4 py-3 text-xs">{row.batch_year}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1.5">
@@ -216,9 +216,9 @@ function VerificationTab() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <div className="font-display text-lg">{preview.row.full_name}</div>
-                <div className="text-xs text-muted-foreground">{preview.row.academic_id}</div>
+                <div className="text-xs text-foreground/75">{preview.row.academic_id}</div>
               </div>
-              <button onClick={() => setPreview(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+              <button onClick={() => setPreview(null)} className="text-foreground/75 hover:text-foreground">✕</button>
             </div>
             <img src={preview.url} alt="بطاقة جامعية" className="max-h-[60vh] w-full rounded-lg object-contain" />
             <div className="mt-4 flex gap-2">
@@ -329,7 +329,7 @@ function AdminsTab() {
     <div className="space-y-6">
       <div className="cosmic-card rounded-2xl p-6">
         <h3 className="font-display text-lg">تعيين أدمن بالإيميل</h3>
-        <p className="mt-1 text-sm text-muted-foreground">المستخدم لازم يسجل دخول بحساب جوجل أولاً.</p>
+        <p className="mt-1 text-sm text-foreground/75">المستخدم لازم يسجل دخول بحساب جوجل أولاً.</p>
         <form onSubmit={grantAdmin} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input
             type="email"
@@ -351,7 +351,7 @@ function AdminsTab() {
 
       <div className="cosmic-card overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-2 border-b border-border bg-secondary/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">كل المستخدمين ({allUsers.length})</div>
+          <div className="text-xs uppercase tracking-wider text-foreground/75">كل المستخدمين ({allUsers.length})</div>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -370,10 +370,10 @@ function AdminsTab() {
                 <li key={u.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="truncate font-medium">{u.full_name ?? "—"}</div>
-                    <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                    <div className="truncate text-xs text-foreground/75">{u.email}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] text-foreground/75">
                       {u.verification_status}
                     </span>
                     {isSuper && (
@@ -404,7 +404,7 @@ function AdminsTab() {
               );
             })}
             {filtered.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-muted-foreground">لا يوجد مستخدمين مطابقين</li>
+              <li className="px-4 py-8 text-center text-sm text-foreground/75">لا يوجد مستخدمين مطابقين</li>
             )}
           </ul>
         )}
