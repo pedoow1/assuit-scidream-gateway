@@ -53,13 +53,16 @@ function getColors(prog: number) {
   };
 }
 
-// 130 stars, precomputed
+// 130 stars, fully deterministic — no Math.random() to avoid SSR hydration mismatch
+function seededVal(seed: number, mul: number, offset: number) {
+  return Math.abs(Math.sin(seed * mul)) * offset;
+}
 const STARS = Array.from({ length: 130 }, (_, i) => ({
   x: ((Math.sin(i * 137.508) * 0.5 + 0.5) * 100).toFixed(2),
   y: ((Math.cos(i * 97.3) * 0.5 + 0.5) * 75).toFixed(2),
-  r: (Math.random() * 1.5 + 0.5).toFixed(2),
-  spd: (Math.random() * 1.5 + 1.2).toFixed(2),
-  del: (Math.random() * 4).toFixed(2),
+  r: (seededVal(i, 73.1, 1.5) + 0.5).toFixed(2),
+  spd: (seededVal(i, 53.7, 1.5) + 1.2).toFixed(2),
+  del: (seededVal(i, 31.4, 4)).toFixed(2),
 }));
 
 // Cloud layer configs
@@ -210,8 +213,9 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
     boyTargetRef.current = 108 - extProg * 128;
   }, [extProg]);
 
-  // RAF loop
+  // RAF loop — client-only guard required for SSR (TanStack Start)
   useEffect(() => {
+    if (typeof window === "undefined" || typeof requestAnimationFrame === "undefined") return;
     let prev = performance.now();
     const tick = (now: number) => {
       const dt = (now - prev) / 1000; prev = now;
