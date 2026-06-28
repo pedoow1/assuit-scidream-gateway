@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut, MapPin, FlaskConical, LayoutGrid } from "lucide-react";
+import { Loader2, BookOpen, Brain, Calculator, FileText, Sparkles, Bell, ShieldCheck, LogOut, MapPin, FlaskConical, LayoutGrid, GraduationCap } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CosmicBackground } from "@/components/CosmicBackground";
@@ -18,6 +18,7 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
   { icon: FileText, label: "ملاحظاتي", color: "from-rose/40 to-cosmic/40", to: "/notes" },
   { icon: Sparkles, label: "المساعد الذكي", color: "from-gold/40 to-cosmic/40", to: "/assistant" },
   { icon: Bell, label: "الإعلانات", color: "from-cosmic/40 to-gold/40", to: "/announcements" },
+  { icon: GraduationCap, label: "دورات تدريبية", color: "from-gold/60 to-rose/60", to: "/courses" },
 ];
 
 const AUDITORIUMS = [
