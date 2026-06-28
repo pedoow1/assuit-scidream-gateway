@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
 import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe } from "lucide-react";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
@@ -41,201 +40,24 @@ const GOALS = [
 
 function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+  const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Sky color transitions: sunrise → day → golden hour → sunset
-  const skyColor = useTransform(
-    scrollYProgress,
-    [0, 0.25, 0.5, 0.75, 1],
-    [
-      "linear-gradient(180deg, #ff9a5c 0%, #ffcf77 30%, #ffe8a0 60%, #c8e8d8 100%)",   // شروق
-      "linear-gradient(180deg, #87ceeb 0%, #b0dff0 35%, #d8f0f8 65%, #e8f5e0 100%)",   // نهار
-      "linear-gradient(180deg, #5b9bd5 0%, #87ceeb 35%, #c5e8f5 65%, #d8f0e0 100%)",   // ظهر
-      "linear-gradient(180deg, #f4a460 0%, #ff8c42 25%, #ffb347 50%, #ffd700 70%, #c8e890 100%)", // عصر
-      "linear-gradient(180deg, #2c1654 0%, #8b2fc9 20%, #e05c5c 40%, #ff8c42 60%, #ffd700 80%, #4a7c59 100%)", // غروب
-    ]
-  );
-
-  // Sun position: rises from bottom-right, sets to bottom-left
-  const sunX = useTransform(scrollYProgress, [0, 1], ["75%", "25%"]);
-  const sunY = useTransform(scrollYProgress, [0, 0.5, 1], ["60%", "8%", "55%"]);
-  const sunColor = useTransform(
-    scrollYProgress,
-    [0, 0.25, 0.5, 0.75, 1],
-    ["rgba(255,180,80,0.9)", "rgba(255,230,100,0.7)", "rgba(255,220,80,0.6)", "rgba(255,140,50,0.85)", "rgba(255,80,30,0.8)"]
-  );
-  const sunSize = useTransform(scrollYProgress, [0, 0.5, 1], ["80px", "60px", "90px"]);
-
-  // Clouds parallax
-  const cloudsX = useTransform(scrollYProgress, [0, 1], ["0%", "-15%"]);
-  const cloudsOpacity = useTransform(scrollYProgress, [0, 0.4, 0.7, 1], [0.7, 0.9, 0.8, 0.5]);
-
-  // River shimmer
-  const riverOpacity = useTransform(scrollYProgress, [0, 0.3, 1], [0.4, 0.7, 0.9]);
-  const riverColor = useTransform(
-    scrollYProgress,
-    [0, 0.5, 1],
-    ["rgba(255,180,100,0.5)", "rgba(100,180,230,0.6)", "rgba(255,120,60,0.65)"]
-  );
-
-  // Birds appear after 20% scroll
-  const birdsOpacity = useTransform(scrollYProgress, [0.15, 0.3], [0, 1]);
-  const birdsY = useTransform(scrollYProgress, [0.15, 1], ["80px", "-40px"]);
-  const birdsX = useTransform(scrollYProgress, [0.15, 1], ["-5%", "8%"]);
-
-  // Trees parallax
-  const treesY = useTransform(scrollYProgress, [0, 1], ["0px", "40px"]);
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.documentElement;
+      const max = el.scrollHeight - el.clientHeight;
+      setScrollProgress(max > 0 ? Math.min(el.scrollTop / max, 1) : 0);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div ref={containerRef} className="relative min-h-screen overflow-hidden" dir="rtl">
 
-      {/* ═══ ANIMATED BACKGROUND ═══ */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+      <CosmicBackground scrollProgress={scrollProgress} />
 
-        {/* Sky — transitions with scroll */}
-        <motion.div className="absolute inset-0" style={{ background: skyColor }} />
-
-        {/* Sun */}
-        <motion.div
-          style={{
-            position: "absolute",
-            left: sunX,
-            top: sunY,
-            width: sunSize,
-            height: sunSize,
-            borderRadius: "50%",
-            background: sunColor,
-            filter: "blur(8px)",
-            boxShadow: "0 0 60px 20px rgba(255,180,80,0.4)",
-            transform: "translate(-50%, -50%)",
-          }}
-        />
-        {/* Sun glow halo */}
-        <motion.div
-          style={{
-            position: "absolute",
-            left: sunX,
-            top: sunY,
-            width: "200px",
-            height: "200px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(255,200,80,0.25) 0%, transparent 70%)",
-            filter: "blur(20px)",
-            transform: "translate(-50%, -50%)",
-          }}
-        />
-
-        {/* Clouds */}
-        <motion.div className="absolute inset-0" style={{ x: cloudsX, opacity: cloudsOpacity }}>
-          <div className="sky-cloud sc1" />
-          <div className="sky-cloud sc2" />
-          <div className="sky-cloud sc3" />
-          <div className="sky-cloud sc4" />
-          <div className="sky-cloud sc5" />
-        </motion.div>
-
-        {/* Birds — appear on scroll */}
-        <motion.div
-          className="absolute inset-0"
-          style={{ opacity: birdsOpacity, y: birdsY, x: birdsX }}
-        >
-          <svg viewBox="0 0 800 300" className="absolute" style={{ top: "15%", left: "10%", width: "60%", height: "auto" }}>
-            {/* Bird flock — simple M shapes */}
-            <g fill="none" stroke="rgba(30,20,10,0.75)" strokeWidth="2.5" strokeLinecap="round">
-              {/* Bird 1 */}
-              <path d="M100,80 Q112,68 124,80"><animateTransform attributeName="transform" type="translate" values="0,0;0,-8;0,0" dur="1.8s" repeatCount="indefinite"/></path>
-              {/* Bird 2 */}
-              <path d="M140,60 Q152,48 164,60"><animateTransform attributeName="transform" type="translate" values="0,0;0,-10;0,0" dur="2s" begin="0.2s" repeatCount="indefinite"/></path>
-              {/* Bird 3 */}
-              <path d="M175,75 Q187,63 199,75"><animateTransform attributeName="transform" type="translate" values="0,0;0,-7;0,0" dur="1.6s" begin="0.4s" repeatCount="indefinite"/></path>
-              {/* Bird 4 */}
-              <path d="M210,55 Q222,43 234,55"><animateTransform attributeName="transform" type="translate" values="0,0;0,-12;0,0" dur="2.2s" begin="0.1s" repeatCount="indefinite"/></path>
-              {/* Bird 5 */}
-              <path d="M155,90 Q167,78 179,90"><animateTransform attributeName="transform" type="translate" values="0,0;0,-6;0,0" dur="1.9s" begin="0.6s" repeatCount="indefinite"/></path>
-              {/* Bird 6 */}
-              <path d="M245,70 Q257,58 269,70"><animateTransform attributeName="transform" type="translate" values="0,0;0,-9;0,0" dur="2.1s" begin="0.3s" repeatCount="indefinite"/></path>
-              {/* Bird 7 small far */}
-              <path d="M300,50 Q308,43 316,50" strokeWidth="1.8"><animateTransform attributeName="transform" type="translate" values="0,0;0,-5;0,0" dur="1.7s" begin="0.8s" repeatCount="indefinite"/></path>
-              {/* Bird 8 small far */}
-              <path d="M330,62 Q338,55 346,62" strokeWidth="1.8"><animateTransform attributeName="transform" type="translate" values="0,0;0,-7;0,0" dur="2s" begin="0.5s" repeatCount="indefinite"/></path>
-            </g>
-          </svg>
-        </motion.div>
-
-        {/* Trees layer — parallax */}
-        <motion.div className="absolute bottom-0 left-0 right-0" style={{ y: treesY }}>
-          <svg viewBox="0 0 1440 400" preserveAspectRatio="none" style={{ width: "100%", height: "280px", display: "block" }}>
-            {/* Far trees */}
-            <path d="M0,320 L50,240 L90,280 L140,210 L180,255 L230,200 L275,245 L325,200 L370,240 L420,195 L465,235 L515,195 L565,235 L620,195 L670,235 L725,195 L775,235 L830,195 L880,235 L935,195 L985,235 L1040,195 L1090,235 L1145,195 L1195,232 L1250,195 L1300,232 L1355,198 L1400,228 L1440,205 L1440,400 L0,400 Z"
-              fill="rgba(60,100,55,0.25)" />
-            {/* Mid trees */}
-            <path d="M0,350 L45,270 L80,305 L120,255 L165,295 L210,250 L260,290 L310,252 L360,290 L415,250 L465,290 L520,250 L575,290 L630,250 L685,290 L740,250 L795,290 L850,250 L905,290 L960,250 L1015,290 L1070,250 L1125,290 L1180,250 L1235,288 L1290,250 L1345,288 L1395,252 L1440,280 L1440,400 L0,400 Z"
-              fill="rgba(40,80,40,0.5)" />
-            {/* Front trees dark */}
-            <path d="M0,400 L25,330 L50,365 L75,320 L105,350 L135,315 L165,348 L200,315 L235,348 L275,312 L315,346 L360,312 L405,346 L455,310 L505,344 L558,310 L612,344 L665,310 L718,344 L770,310 L822,344 L874,310 L926,344 L978,310 L1030,344 L1082,310 L1134,344 L1186,310 L1238,344 L1290,312 L1340,344 L1390,316 L1440,340 L1440,400 Z"
-              fill="rgba(25,55,28,0.85)" />
-            {/* River at bottom */}
-            <ellipse cx="720" cy="395" rx="350" ry="18" fill="rgba(100,180,220,0.35)" />
-          </svg>
-        </motion.div>
-
-        {/* River shimmer overlay */}
-        <motion.div
-          style={{
-            position: "absolute",
-            bottom: "0",
-            left: "25%",
-            width: "50%",
-            height: "28px",
-            borderRadius: "50%",
-            background: riverColor,
-            filter: "blur(8px)",
-            opacity: riverOpacity,
-          }}
-        />
-
-        {/* Sunset warm glow at horizon */}
-        <motion.div
-          style={{
-            position: "absolute",
-            bottom: "15%",
-            left: "0",
-            right: "0",
-            height: "120px",
-            background: useTransform(
-              scrollYProgress,
-              [0, 0.5, 1],
-              [
-                "linear-gradient(to top, rgba(255,180,80,0.2), transparent)",
-                "linear-gradient(to top, rgba(100,180,220,0.1), transparent)",
-                "linear-gradient(to top, rgba(255,80,30,0.35), transparent)",
-              ]
-            ),
-            filter: "blur(15px)",
-          }}
-        />
-      </div>
-
-      <style>{`
-        .sky-cloud {
-          position: absolute;
-          border-radius: 80px;
-          background: rgba(255,255,255,0.75);
-          filter: blur(16px);
-          animation: skyCloudDrift linear infinite;
-        }
-        .sc1 { top: 10%; left: -350px; width: 300px; height: 65px; animation-duration: 60s; opacity: 0.8; }
-        .sc2 { top: 18%; left: -200px; width: 220px; height: 50px; animation-duration: 80s; animation-delay: -25s; opacity: 0.65; }
-        .sc3 { top: 6%;  left: -500px; width: 400px; height: 80px; animation-duration: 70s; animation-delay: -40s; opacity: 0.7; }
-        .sc4 { top: 24%; left: -300px; width: 180px; height: 42px; animation-duration: 95s; animation-delay: -60s; opacity: 0.55; }
-        .sc5 { top: 13%; left: -450px; width: 260px; height: 58px; animation-duration: 75s; animation-delay: -15s; opacity: 0.6; }
-        @keyframes skyCloudDrift {
-          from { transform: translateX(0); }
-          to   { transform: translateX(calc(100vw + 700px)); }
-        }
-      `}</style>
-
-      {/* Nav */}
+            {/* Nav */}
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-3">
           <Logo size={44} />
