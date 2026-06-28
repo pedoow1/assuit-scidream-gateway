@@ -79,7 +79,7 @@ function PendingPage() {
                   السبب: {profile.rejection_reason}
                 </div>
               )}
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm text-foreground/75">
                 صحّح بياناتك وحاول تاني.
               </p>
               <Link
@@ -95,14 +95,14 @@ function PendingPage() {
                 <Clock className="h-7 w-7 text-foreground animate-pulse" />
               </div>
               <h1 className="mt-4 font-display text-2xl">تلقينا طلبك ✨</h1>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-3 text-sm leading-relaxed text-foreground/75">
                 فريق Dream Team بيراجع بياناتك دلوقتي — هتقدر تدخل المنصة بمجرد ما يتأكدوا إنك من طلاب الكلية.
               </p>
-              <div className="mt-5 rounded-xl bg-secondary/40 p-4 text-right text-xs text-muted-foreground">
+              <div className="mt-5 rounded-xl bg-secondary/40 p-4 text-right text-xs text-foreground/75">
                 <div><span className="font-semibold text-foreground">الاسم:</span> {profile.full_name}</div>
                 <div className="mt-1"><span className="font-semibold text-foreground">الرقم الأكاديمي:</span> {profile.academic_id}</div>
               </div>
-              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-foreground/75">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>بنتحقق من حالة طلبك تلقائياً…</span>
               </div>
@@ -111,7 +111,7 @@ function PendingPage() {
 
           <button
             onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}
-            className="mt-6 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            className="mt-6 inline-flex items-center gap-1.5 text-xs text-foreground/75 hover:text-foreground"
           >
             <LogOut className="h-3.5 w-3.5" /> تسجيل خروج
           </button>
