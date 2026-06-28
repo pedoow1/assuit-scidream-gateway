@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ═══════════════════════════════════════════════════════
 //  5 sky phases: فجر → ضحى → ظهر → عصر → غروب
@@ -110,75 +110,7 @@ function CloudSVG({ shape, color, w }: { shape: number; color: string; w: number
   );
 }
 
-function FlyingBoy({ glow }: { glow: string }) {
-  return (
-    <svg width={130} height={155} viewBox="-65 -80 130 155"
-      style={{ filter: `drop-shadow(0 6px 20px ${glow})` }}>
-      {/* Aura rings */}
-      <ellipse cx={0} cy={0} rx={58} ry={58} fill="none" stroke={glow} strokeWidth={14} opacity={0.18}/>
-      <ellipse cx={0} cy={0} rx={42} ry={42} fill="none" stroke={glow} strokeWidth={8}  opacity={0.12}/>
-      {/* Body jacket */}
-      <ellipse cx={0} cy={2} rx={20} ry={26} fill="#160828"/>
-      <path d="M-12,20 Q0,34 12,20" stroke="#4a1060" strokeWidth={3} fill="none" strokeLinecap="round"/>
-      <path d="M-8,-6 Q0,8 8,-6"    stroke="#d04060" strokeWidth={2.5} fill="none" strokeLinecap="round"/>
-      {/* Cape */}
-      <path d="M12,-10 Q38,2 40,24 Q30,35 18,22 Q20,8 12,-10 Z" fill="rgba(180,40,70,0.72)"/>
-      {/* Head */}
-      <circle cx={0} cy={-36} r={17} fill="#f0c878"/>
-      {/* Hair spiky */}
-      <ellipse cx={0}   cy={-48} rx={16} ry={9}  fill="#120810"/>
-      <ellipse cx={-10} cy={-44} rx={7}  ry={12} fill="#120810"/>
-      <ellipse cx={10}  cy={-44} rx={6}  ry={10} fill="#120810" transform="rotate(12,10,-44)"/>
-      <ellipse cx={0}   cy={-50} rx={5}  ry={7}  fill="#120810" transform="rotate(-8,0,-50)"/>
-      <ellipse cx={-16} cy={-34} rx={4}  ry={5}  fill="#e0b860"/>
-      {/* Right arm up */}
-      <path d="M14,-12 Q32,-28 44,-42" stroke="#160828" strokeWidth={11} fill="none" strokeLinecap="round"/>
-      <ellipse cx={46} cy={-44} rx={8} ry={10} fill="#f0c878" transform="rotate(-35,46,-44)"/>
-      {/* Left arm back */}
-      <path d="M-14,-6 Q-24,10 -28,24" stroke="#100620" strokeWidth={10} fill="none" strokeLinecap="round"/>
-      <ellipse cx={-28} cy={26} rx={7} ry={9} fill="#e0b860" transform="rotate(18,-28,26)"/>
-      {/* Legs */}
-      <path d="M-7,22 Q-18,40 -24,58" stroke="#160828" strokeWidth={11} fill="none" strokeLinecap="round"/>
-      <path d="M7,22 Q18,34 26,48"    stroke="#100620" strokeWidth={10} fill="none" strokeLinecap="round"/>
-      {/* Shoes */}
-      <ellipse cx={-26} cy={62} rx={11} ry={7} fill="#080808" transform="rotate(-22,-26,62)"/>
-      <ellipse cx={28}  cy={52} rx={11} ry={7} fill="#080808" transform="rotate(18,28,52)"/>
-    </svg>
-  );
-}
 
-// ═══ Sparkle Trail ═══
-function SparkleTrail({ boyX, boyY, time }: { boyX: number; boyY: number; time: number }) {
-  const sparks = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => ({
-      ox: 2 + i * 1.8,
-      oy: Math.sin(i * 1.3) * 3,
-      sz: 3 + i * 0.8,
-      dp: i * 0.12,
-    })), []);
-
-  return (
-    <>
-      {sparks.map((s, i) => {
-        const alpha = 0.25 + 0.45 * Math.sin(time * 2.8 + s.dp * 10);
-        const sc   = 0.4  + 0.6  * Math.sin(time * 2.2 + s.dp * 8);
-        return (
-          <div key={i} style={{
-            position:"absolute",
-            left:`${boyX + s.ox}%`,
-            top:`${boyY + s.oy - 4}%`,
-            width:s.sz, height:s.sz,
-            borderRadius:"50%",
-            background:`rgba(255,215,100,${alpha})`,
-            transform:`translate(-50%,-50%) scale(${sc})`,
-            boxShadow:`0 0 ${s.sz * 2.5}px rgba(255,200,80,${alpha * 0.6})`,
-            pointerEvents:"none",
-          }}/>
-        );
-      })}
-    </>
-  );
-}
 
 // ═══════════════════════════════════════════════════════
 //  MAIN EXPORT — drop-in replacement for CosmicBackground
@@ -188,9 +120,7 @@ function SparkleTrail({ boyX, boyY, time }: { boyX: number; boyY: number; time: 
 export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?: number; density?: number }) {
   const [scroll, setScroll]   = useState(extProg ?? 0);
   const [time,   setTime]     = useState(0);
-  const [boyX,   setBoyX]     = useState(108);
-  const boyTargetRef = useRef(108);
-  const rafRef       = useRef<number>(0);
+  const rafRef                = useRef<number>(0);
 
   // If no external progress, drive from window scroll
   useEffect(() => {
@@ -200,7 +130,6 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
       const max = el.scrollHeight - el.clientHeight;
       const p   = max > 0 ? Math.min(el.scrollTop / max, 1) : 0;
       setScroll(p);
-      boyTargetRef.current = 108 - p * 128;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -210,7 +139,6 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
   useEffect(() => {
     if (extProg === undefined) return;
     setScroll(extProg);
-    boyTargetRef.current = 108 - extProg * 128;
   }, [extProg]);
 
   // RAF loop — client-only guard required for SSR (TanStack Start)
@@ -220,7 +148,6 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
     const tick = (now: number) => {
       const dt = (now - prev) / 1000; prev = now;
       setTime(t => t + dt);
-      setBoyX(x => x + (boyTargetRef.current - x) * 0.035);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -235,8 +162,6 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
   const sunY  = Math.max(4, 52 - Math.abs(Math.sin(angle)) * 50);
   const moonX = 50 + Math.cos(angle + Math.PI) * 38;
   const moonY = Math.max(4, 52 - Math.abs(Math.sin(angle + Math.PI)) * 46);
-
-  const boyY  = 38 + Math.sin(time * 0.7) * 2.8;
 
   const skyGrad = `linear-gradient(180deg,
     ${c.sky[0]} 0%, ${c.sky[1]} 20%, ${c.sky[2]} 45%,
@@ -324,35 +249,6 @@ export function CosmicBackground({ scrollProgress: extProg }: { scrollProgress?:
           ))}
         </div>
       ))}
-
-      {/* Flying boy */}
-      <div style={{
-        position:"absolute",
-        left:`${boyX}%`,
-        top:`${boyY}%`,
-        transform:"translate(-50%,-50%)",
-        zIndex:10,
-        pointerEvents:"none",
-      }}>
-        <FlyingBoy glow={c.sunGlow}/>
-        {/* Speed lines */}
-        {scroll > 0.02 && (
-          <svg width={80} height={60} viewBox="0 0 80 60" style={{
-            position:"absolute", right:"100%", top:"30%",
-            opacity: Math.min(0.7, scroll * 3),
-          }}>
-            {([
-              [10,55],[25,42],[35,60],[45,35],[5,48],
-            ] as [number,number][]).map(([y,len],i) => (
-              <line key={i} x1={80} y1={y} x2={80-len} y2={y}
-                stroke="rgba(255,220,140,0.28)" strokeWidth={1.5} strokeLinecap="round"/>
-            ))}
-          </svg>
-        )}
-      </div>
-
-      {/* Sparkle trail */}
-      <SparkleTrail boyX={boyX} boyY={boyY} time={time}/>
 
       {/* Cloud keyframes */}
       <style>{`
