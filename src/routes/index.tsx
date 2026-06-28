@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe, X, Send, Loader2 } from "lucide-react";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -443,6 +445,15 @@ function LandingPage() {
             ))}
           </div>
 
+          {/* انضم إلى فريق Dream Team */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-8"
+          >
+            <CommitteeApplicationSection />
+
           {/* نبذة عن الأسرة */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -667,5 +678,230 @@ function Fortunecookie() {
         </motion.div>
       )}
     </>
+  );
+}
+
+
+/* ── Committee Application Section ── */
+function CommitteeApplicationSection() {
+  const [selectedCommittee, setSelectedCommittee] = useState<string | null>(null);
+
+  const committees = [
+    { name: "PR Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/bhgnnvg.jpeg" },
+    { name: "Media Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/hgbjyvv.jpeg" },
+    { name: "HR Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/hvgghgvv.jpeg" },
+    { name: "OC Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ojjgthn.jpeg" },
+    { name: "AC Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ooooo.jpeg" },
+  ];
+
+  return (
+    <>
+      <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-2">انضم إلينا</div>
+      <h3 className="font-display text-2xl md:text-3xl text-center mb-2">انضم إلى فريق Dream Team</h3>
+      <p className="text-sm text-foreground/75 text-center mb-6 max-w-lg mx-auto">
+        كن جزءاً من أسرة Dream Team وساهم في صنع تجربة جامعية استثنائية — اضغط على اللجنة المناسبة لك وقدّم طلبك فوراً.
+      </p>
+
+      {/* Join Us Banner */}
+      <div className="flex justify-center mb-8">
+        <img
+          src="https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ggfghbbb.jpeg"
+          alt="انضم إلى Dream Team"
+          className="w-full max-w-sm rounded-2xl object-cover shadow-lg"
+        />
+      </div>
+
+      {/* اللجان */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {committees.map((committee) => (
+          <motion.button
+            key={committee.name}
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setSelectedCommittee(committee.name)}
+            className="rounded-2xl overflow-hidden shadow-md cursor-pointer text-left w-full focus:outline-none focus:ring-2 focus:ring-accent/50"
+          >
+            <img
+              src={committee.img}
+              alt={committee.name}
+              className="w-full h-auto object-cover"
+            />
+          </motion.button>
+        ))}
+      </div>
+
+      <p className="text-center text-xs text-foreground/50 mt-4">اضغط على أي لجنة لتقديم طلب الانضمام</p>
+
+      {selectedCommittee && (
+        <CommitteeModal
+          committee={selectedCommittee}
+          onClose={() => setSelectedCommittee(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ── Committee Application Modal ── */
+const COMMITTEES = ["PR Committee", "Media Committee", "HR Committee", "OC Committee", "AC Committee"];
+
+interface CommitteeModalProps {
+  committee: string;
+  onClose: () => void;
+}
+
+function CommitteeModal({ committee, onClose }: CommitteeModalProps) {
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    academic_year: "",
+    why_join: "",
+    skills: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.full_name || !form.email || !form.phone || !form.academic_year || !form.why_join) {
+      toast.error("من فضلك اكمل كل الحقول المطلوبة");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.from("committee_applications").insert({
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      academic_year: form.academic_year,
+      committee,
+      why_join: form.why_join,
+      skills: form.skills || null,
+    });
+    setLoading(false);
+    if (error) {
+      toast.error("حصل خطأ، حاول تاني");
+    } else {
+      setDone(true);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+        {/* Modal */}
+        <motion.div
+          className="relative w-full max-w-md bg-background border border-border rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.9, y: 20 }}
+        >
+          <button onClick={onClose} className="absolute top-4 left-4 text-foreground/50 hover:text-foreground transition">
+            <X className="h-5 w-5" />
+          </button>
+
+          {done ? (
+            <div className="text-center py-8">
+              <div className="text-5xl mb-4">🌟</div>
+              <h3 className="font-display text-2xl mb-2">تم الإرسال!</h3>
+              <p className="text-sm text-foreground/75">طلبك في {committee} وصلنا، هيتواصلوا معاك قريباً.</p>
+              <button
+                onClick={onClose}
+                className="mt-6 px-6 py-2.5 rounded-full bg-accent text-background font-semibold text-sm"
+              >
+                تمام 🎉
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="text-center mb-6">
+                <div className="text-xs font-semibold uppercase tracking-widest text-accent mb-1">انضم إلينا</div>
+                <h3 className="font-display text-xl">{committee}</h3>
+                <p className="text-xs text-foreground/60 mt-1">اكتب بياناتك وهيتواصلوا معاك</p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {[
+                  { key: "full_name", label: "الاسم كامل *", placeholder: "محمد أحمد علي", type: "text" },
+                  { key: "email", label: "الإيميل *", placeholder: "example@gmail.com", type: "email" },
+                  { key: "phone", label: "رقم الموبايل *", placeholder: "01xxxxxxxxx", type: "tel" },
+                ].map((f) => (
+                  <div key={f.key}>
+                    <label className="text-xs font-medium text-foreground/75 block mb-1">{f.label}</label>
+                    <input
+                      type={f.type}
+                      placeholder={f.placeholder}
+                      value={(form as any)[f.key]}
+                      onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                      className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 text-right"
+                      dir="rtl"
+                    />
+                  </div>
+                ))}
+
+                <div>
+                  <label className="text-xs font-medium text-foreground/75 block mb-1">السنة الدراسية *</label>
+                  <select
+                    value={form.academic_year}
+                    onChange={(e) => setForm((prev) => ({ ...prev, academic_year: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 text-right"
+                    dir="rtl"
+                  >
+                    <option value="">اختر السنة</option>
+                    <option value="الأولى">الأولى</option>
+                    <option value="الثانية">الثانية</option>
+                    <option value="الثالثة">الثالثة</option>
+                    <option value="الرابعة">الرابعة</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground/75 block mb-1">ليه عايز تنضم؟ *</label>
+                  <textarea
+                    placeholder="اكتب سبب انضمامك والي عايز تقدمه للفريق..."
+                    value={form.why_join}
+                    onChange={(e) => setForm((prev) => ({ ...prev, why_join: e.target.value }))}
+                    rows={3}
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 text-right resize-none"
+                    dir="rtl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground/75 block mb-1">مهاراتك (اختياري)</label>
+                  <textarea
+                    placeholder="تصميم، تصوير، كتابة محتوى، تنظيم فعاليات..."
+                    value={form.skills}
+                    onChange={(e) => setForm((prev) => ({ ...prev, skills: e.target.value }))}
+                    rows={2}
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 text-right resize-none"
+                    dir="rtl"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="mt-2 flex items-center justify-center gap-2 w-full rounded-full bg-gradient-cosmic text-primary-foreground font-semibold py-3 text-sm transition hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {loading ? "جاري الإرسال..." : "أرسل طلبك"}
+                </button>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
