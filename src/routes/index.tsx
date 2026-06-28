@@ -749,6 +749,39 @@ function CommitteeApplicationSection() {
 /* ── Committee Application Modal ── */
 const COMMITTEES = ["PR Committee", "Media Committee", "HR Committee", "OC Committee", "AC Committee"];
 
+const COMMITTEE_INFO: Record<string, { fullName: string; description: string; traits: string }> = {
+  "HR Committee": {
+    fullName: "لجنة الموارد البشرية — Human Resources",
+    description:
+      "تُعدّ لجنة الموارد البشرية من أبرز لجان الأسرة وأكثرها أهميةً؛ إذ تضطلع بمهمة متابعة أداء الأعضاء وتقييمه، وتطوير مهاراتهم، وإجراء المقابلات، وتنظيم مسار العمل داخل الأسرة. تقوم هذه اللجنة على ركيزتَي الانضباط وإدارة الوقت، وتؤمن بأن تحسين آليات العمل مقدَّمٌ على العمل ذاته.",
+    traits: "الشخصية القيادية، الانضباط في المواعيد، القدرة على إدارة الوقت والفرق.",
+  },
+  "OC Committee": {
+    fullName: "لجنة التنظيم — Organization Committee",
+    description:
+      "تتولى لجنة التنظيم الإشراف على تخطيط المؤتمرات والفعاليات الجامعية وتنفيذها بصورة احترافية. تعمل هذه اللجنة خلف الكواليس لضمان سير كل تفصيلة على أكمل وجه، مما يجعلها العمود الفقري لأي نشاط تُقيمه الأسرة.",
+    traits: "تحمُّل المسؤولية، المرونة في التعامل، الصبر، وحل المشكلات.",
+  },
+  "PR Committee": {
+    fullName: "لجنة العلاقات العامة — Public Relations",
+    description:
+      "تمثّل لجنة العلاقات العامة الواجهة الرسمية للأسرة في تعاملاتها الخارجية؛ فهي المسؤولة عن بناء الشراكات، وتمثيل الأسرة في المحافل، وإيصال رسالتها إلى أوسع الآفاق. أعضاؤها هم السُّفراء الذين يعكسون هوية Dream Team وقيمها أمام العالم الخارجي.",
+    traits: "الكاريزما، الفصاحة، القدرة على الإقناع، وبناء العلاقات.",
+  },
+  "Media Committee": {
+    fullName: "لجنة الإعلام — Media Committee",
+    description:
+      "تتكفّل لجنة الإعلام بتوثيق فعاليات الأسرة ونشاطاتها، سواء أكان ذلك عبر التصوير الفوتوغرافي أم مقاطع الفيديو أم محتوى وسائل التواصل الاجتماعي. تحوّل هذه اللجنة اللحظات العابرة إلى ذكريات راسخة، وتُبرز إنجازات الأسرة بأسلوب إبداعي يليق بطموحاتها.",
+    traits: "الرؤية الإبداعية، إتقان التصوير والمونتاج، الاهتمام بالتفاصيل البصرية.",
+  },
+  "AC Committee": {
+    fullName: "لجنة الأنشطة — Activities Committee",
+    description:
+      "تُعدّ لجنة الأنشطة المحرّك الرئيسي للحيوية داخل الأسرة؛ إذ تتولى ابتكار الأنشطة والفعاليات الترفيهية والثقافية والتعليمية وتنفيذها. تعمل هذه اللجنة على تحويل الأفكار البسيطة إلى تجارب لا تُنسى، وتُعيد كسر الروتين في كل مرة.",
+    traits: "الإبداع، روح الفريق، حب المشاركة، والقدرة على بثّ الطاقة الإيجابية.",
+  },
+};
+
 interface CommitteeModalProps {
   committee: string;
   onClose: () => void;
@@ -757,8 +790,8 @@ interface CommitteeModalProps {
 function CommitteeModal({ committee, onClose }: CommitteeModalProps) {
   const [form, setForm] = useState({
     full_name: "",
-    email: "",
-    phone: "",
+    academic_id: "",
+    whatsapp: "",
     academic_year: "",
     why_join: "",
     skills: "",
@@ -766,16 +799,18 @@ function CommitteeModal({ committee, onClose }: CommitteeModalProps) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
+  const info = COMMITTEE_INFO[committee];
+
   const handleSubmit = async () => {
-    if (!form.full_name || !form.email || !form.phone || !form.academic_year || !form.why_join) {
-      toast.error("من فضلك اكمل كل الحقول المطلوبة");
+    if (!form.full_name || !form.academic_id || !form.whatsapp || !form.academic_year || !form.why_join) {
+      toast.error("من فضلك أكمل جميع الحقول المطلوبة");
       return;
     }
     setLoading(true);
     const { error } = await supabase.from("committee_applications").insert({
       full_name: form.full_name,
-      email: form.email,
-      phone: form.phone,
+      email: form.academic_id,   // reusing email column for academic_id
+      phone: form.whatsapp,      // reusing phone column for whatsapp
       academic_year: form.academic_year,
       committee,
       why_join: form.why_join,
@@ -783,7 +818,7 @@ function CommitteeModal({ committee, onClose }: CommitteeModalProps) {
     });
     setLoading(false);
     if (error) {
-      toast.error("حصل خطأ، حاول تاني");
+      toast.error("حدث خطأ، يُرجى المحاولة مجدداً");
     } else {
       setDone(true);
     }
@@ -813,29 +848,40 @@ function CommitteeModal({ committee, onClose }: CommitteeModalProps) {
 
           {done ? (
             <div className="text-center py-8">
-              <div className="text-5xl mb-4">🌟</div>
-              <h3 className="font-display text-2xl mb-2">تم الإرسال!</h3>
-              <p className="text-sm text-foreground/75">طلبك في {committee} وصلنا، هيتواصلوا معاك قريباً.</p>
+              <div className="text-4xl mb-4">✦</div>
+              <h3 className="font-display text-2xl mb-2">تم إرسال طلبك</h3>
+              <p className="text-sm text-foreground/75">
+                تلقّينا طلبك للانضمام إلى {committee}، وسيتواصل معك الفريق في أقرب وقت.
+              </p>
               <button
                 onClick={onClose}
                 className="mt-6 px-6 py-2.5 rounded-full bg-accent text-background font-semibold text-sm"
               >
-                تمام 🎉
+                حسناً
               </button>
             </div>
           ) : (
             <>
-              <div className="text-center mb-6">
-                <div className="text-xs font-semibold uppercase tracking-widest text-accent mb-1">انضم إلينا</div>
-                <h3 className="font-display text-xl">{committee}</h3>
-                <p className="text-xs text-foreground/60 mt-1">اكتب بياناتك وهيتواصلوا معاك</p>
-              </div>
+              {/* Committee Info */}
+              {info && (
+                <div className="mb-6 rounded-2xl bg-accent/8 border border-accent/20 p-4 text-right">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-accent mb-2 text-center">انضم إلينا</div>
+                  <h3 className="font-display text-lg text-center mb-3">{info.fullName}</h3>
+                  <p className="text-xs text-foreground/75 leading-relaxed mb-3">{info.description}</p>
+                  <div className="text-xs bg-background/40 rounded-xl p-3">
+                    <span className="font-semibold text-foreground/80">السمات المطلوبة: </span>
+                    <span className="text-foreground/65">{info.traits}</span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-foreground/50 text-center mb-4">أدخل بياناتك وسيتواصل معك الفريق</p>
 
               <div className="flex flex-col gap-3">
                 {[
-                  { key: "full_name", label: "الاسم كامل *", placeholder: "محمد أحمد علي", type: "text" },
-                  { key: "email", label: "الإيميل *", placeholder: "example@gmail.com", type: "email" },
-                  { key: "phone", label: "رقم الموبايل *", placeholder: "01xxxxxxxxx", type: "tel" },
+                  { key: "full_name", label: "الاسم الكامل *", placeholder: "محمد أحمد علي", type: "text" },
+                  { key: "academic_id", label: "الرقم الأكاديمي *", placeholder: "2024XXXXXX", type: "text" },
+                  { key: "whatsapp", label: "رقم الواتساب *", placeholder: "01xxxxxxxxx", type: "tel" },
                 ].map((f) => (
                   <div key={f.key}>
                     <label className="text-xs font-medium text-foreground/75 block mb-1">{f.label}</label>
