@@ -130,7 +130,7 @@ function SubjectDetailPage() {
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/subjects" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/subjects" className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
             <ArrowLeft className="h-4 w-4 rotate-180" /> كل المواد
           </Link>
           <Logo size={36} />
@@ -139,7 +139,7 @@ function SubjectDetailPage() {
 
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
         {!subject ? (
-          <div className="cosmic-card rounded-2xl p-8 text-center text-muted-foreground">المادة مش موجودة.</div>
+          <div className="cosmic-card rounded-2xl p-8 text-center text-foreground/75">المادة مش موجودة.</div>
         ) : (
           <>
             <div className="cosmic-card rounded-3xl p-6 md:p-8">
@@ -147,14 +147,14 @@ function SubjectDetailPage() {
                 <div>
                   <div className="inline-block rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">{subject.code}</div>
                   <h1 className="mt-3 font-display text-3xl">{subject.name_ar}</h1>
-                  {subject.name_en && <div className="mt-1 text-sm text-muted-foreground">{subject.name_en}</div>}
+                  {subject.name_en && <div className="mt-1 text-sm text-foreground/75">{subject.name_en}</div>}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-secondary px-3 py-1">{subject.department}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">السنة {subject.year}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">الفصل {subject.semester}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">{subject.credit_hours ?? 3} ساعة</span>
                   </div>
-                  {subject.description && <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{subject.description}</p>}
+                  {subject.description && <p className="mt-4 text-sm leading-relaxed text-foreground/75">{subject.description}</p>}
                 </div>
                 <Link
                   to="/subjects/$subjectId/quizzes"
@@ -173,7 +173,7 @@ function SubjectDetailPage() {
               </button>
               {breadcrumb.map((f) => (
                 <div key={f.id} className="flex items-center gap-2">
-                  <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                  <ChevronLeft className="h-3.5 w-3.5 text-foreground/75" />
                   <button onClick={() => setCurrentFolderId(f.id)} className={`rounded-full px-3 py-1 ${currentFolderId === f.id ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
                     {f.name}
                   </button>
@@ -202,7 +202,7 @@ function SubjectDetailPage() {
             {/* Folders grid */}
             {childFolders.length > 0 && (
               <div className="mt-6">
-                <h2 className="text-sm font-semibold text-muted-foreground">الفولدرات</h2>
+                <h2 className="text-sm font-semibold text-foreground/75">الفولدرات</h2>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {childFolders.map((f) => (
                     <div key={f.id} className="cosmic-card group flex items-center justify-between rounded-2xl p-4 transition hover:shadow-glow">
@@ -214,10 +214,10 @@ function SubjectDetailPage() {
                       </button>
                       {isAdmin && (
                         <div className="flex items-center gap-0.5">
-                          <button onClick={() => setEditingFolder(f)} className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                          <button onClick={() => setEditingFolder(f)} className="rounded-full p-2 text-foreground/75 hover:bg-secondary hover:text-foreground">
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button onClick={() => deleteFolder(f.id)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                          <button onClick={() => deleteFolder(f.id)} className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -231,9 +231,9 @@ function SubjectDetailPage() {
             {/* Items */}
             {currentFolderId && (
               <div className="mt-6">
-                <h2 className="text-sm font-semibold text-muted-foreground">المحتوى</h2>
+                <h2 className="text-sm font-semibold text-foreground/75">المحتوى</h2>
                 {items.length === 0 ? (
-                  <div className="mt-3 cosmic-card rounded-2xl p-8 text-center text-sm text-muted-foreground">
+                  <div className="mt-3 cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">
                     مفيش محتوى لحد دلوقتي.
                   </div>
                 ) : (
@@ -245,7 +245,7 @@ function SubjectDetailPage() {
             )}
 
             {childFolders.length === 0 && !currentFolderId && (
-              <div className="mt-6 cosmic-card rounded-2xl p-8 text-center text-sm text-muted-foreground">
+              <div className="mt-6 cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">
                 مفيش فولدرات بعد. {isAdmin && "ابدأ بإضافة فولدر."}
               </div>
             )}
@@ -299,10 +299,10 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Youtube className="h-5 w-5" /></div>
             <div>
               <div className="font-medium">{item.title}</div>
-              {item.description && <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>}
+              {item.description && <p className="mt-1 text-xs text-foreground/75">{item.description}</p>}
             </div>
           </div>
-          {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+          {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
         </div>
         <div className="aspect-video w-full bg-black">
           <iframe
@@ -323,12 +323,12 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose/20 text-rose"><FileText className="h-5 w-5" /></div>
           <div>
             <div className="font-medium">{item.title}</div>
-            {item.description && <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>}
+            {item.description && <p className="mt-1 text-xs text-foreground/75">{item.description}</p>}
           </div>
         </button>
         <div className="flex items-center gap-1">
-          <button onClick={() => onOpenPdf(item.file_url!)} className="rounded-full p-2 text-muted-foreground hover:bg-secondary"><Download className="h-4 w-4" /></button>
-          {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+          <button onClick={() => onOpenPdf(item.file_url!)} className="rounded-full p-2 text-foreground/75 hover:bg-secondary"><Download className="h-4 w-4" /></button>
+          {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
         </div>
       </div>
     );
@@ -348,17 +348,17 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
         </div>
         <div>
           <div className="font-medium">{item.title}</div>
-          {item.description && <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>}
+          {item.description && <p className="mt-1 text-xs text-foreground/75">{item.description}</p>}
           {item.external_url?.includes("drive.google.com") && (
             <span className="mt-1 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] text-green-400">Google Drive PDF</span>
           )}
         </div>
       </a>
       <div className="flex items-center gap-1">
-        <a href={item.external_url ?? "#"} target="_blank" rel="noreferrer" className="rounded-full p-2 text-muted-foreground hover:bg-secondary">
+        <a href={item.external_url ?? "#"} target="_blank" rel="noreferrer" className="rounded-full p-2 text-foreground/75 hover:bg-secondary">
           <Download className="h-4 w-4" />
         </a>
-        {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+        {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
       </div>
     </div>
   );
@@ -607,7 +607,7 @@ function ImportDriveModal({ folderId, onClose, onDone }: { folderId: string; onC
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-secondary"><X className="h-4 w-4" /></button>
         </div>
 
-        <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
+        <p className="mb-3 text-xs text-foreground/75 leading-relaxed">
           حط رابط فولدر Google Drive أو الـ ID بتاعه. لازم الفولدر يكون مشارك على "Anyone with the link can view".
         </p>
 
@@ -629,7 +629,7 @@ function ImportDriveModal({ folderId, onClose, onDone }: { folderId: string; onC
 
         {fetched && files.length > 0 && (
           <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="mb-2 flex items-center justify-between text-xs text-foreground/75">
               <span>{files.length} ملف — اختار اللي تحبه</span>
               <button onClick={toggleAll} className="hover:text-foreground underline">
                 {selected.size === files.length ? "إلغاء الكل" : "تحديد الكل"}
@@ -664,7 +664,7 @@ function ImportDriveModal({ folderId, onClose, onDone }: { folderId: string; onC
         )}
 
         {fetched && files.length === 0 && (
-          <p className="mt-4 text-center text-sm text-muted-foreground">مفيش ملفات في الفولدر ده.</p>
+          <p className="mt-4 text-center text-sm text-foreground/75">مفيش ملفات في الفولدر ده.</p>
         )}
       </div>
     </div>
