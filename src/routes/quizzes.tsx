@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Brain, Loader2, Timer } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 
 export const Route = createFileRoute("/quizzes")({
   head: () => ({ meta: [{ title: "الاختبارات — Assuit SciDream" }] }),
@@ -43,7 +43,7 @@ function QuizzesPage() {
 
   return (
     <div className="relative min-h-screen" dir="rtl">
-      <CosmicBackground density={18} />
+      <StarsBackground />
       <header className="relative z-10 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm hover:text-accent">
