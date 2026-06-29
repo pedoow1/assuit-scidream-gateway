@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { IntroSequence } from "@/components/IntroSequence";
+import { IntroSequence, VideoBackground } from "@/components/IntroSequence";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe, X, Send, Loader2 } from "lucide-react";
-import { CosmicBackground } from "@/components/CosmicBackground";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -82,7 +81,7 @@ function LandingPage() {
         }}
       >
 
-      <CosmicBackground scrollProgress={scrollProgress} />
+      <VideoBackground />
 
             {/* Nav */}
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
