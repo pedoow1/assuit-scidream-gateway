@@ -179,8 +179,8 @@ function WordFlip({ flipping, phase }: { flipping: boolean; phase: number }) {
       display: "flex", gap: "0.4em",
       alignItems: "baseline", justifyContent: "center",
     }}>
-      <FlipWord before="يوما" after="Dream" flipping={flipping} phase={phase} delay={0} />
-      <FlipWord before="ما"   after="Team"  flipping={flipping} phase={phase} delay={100} />
+      <FlipWord before="ما" after="Dream" flipping={flipping} phase={phase} delay={0} />
+      <FlipWord before="يوما"   after="Team"  flipping={flipping} phase={phase} delay={100} />
     </div>
   );
 }
