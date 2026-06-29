@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
 
-// ── ضع هنا رابط الفيديو من Supabase بعد الرفع ──
 const VIDEO_URL = "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6151238-hd_1920_1080_30fps.mp4";
 
 interface Props {
@@ -9,59 +8,42 @@ interface Props {
 
 export function IntroSequence({ onComplete }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  // مراحل الـ intro
-  // 0 = شاشة سوداء + "يوم ما"
-  // 1 = الكلمات بتتقلب → "Dream Team"
-  // 2 = الفيديو بيظهر
-  // 3 = انتهى
-  const [phase, setPhase] = useState(0);
-  const [flipping, setFlipping] = useState(false);
+  const [flipping, setFlipping]         = useState(false);
+  const [phase, setPhase]               = useState(0); // 0=before 1=after
   const [videoVisible, setVideoVisible] = useState(false);
-  const [exiting, setExiting] = useState(false);
+  const [exiting, setExiting]           = useState(false);
 
   useEffect(() => {
-    // المرحلة 0: "يوم ما" لمدة 1.2 ثانية
-    const t1 = setTimeout(() => {
-      setFlipping(true); // بدء animation القلب
-    }, 1200);
+    // فيديو يبدأ على طول في الخلفية بصوت معدوم
+    videoRef.current?.play().catch(() => {});
 
-    // المرحلة 1: بعد القلب (800ms) → إظهار الفيديو
+    // بعد 0.8s الفيديو يبدأ يظهر بـ fade
+    const t0 = setTimeout(() => setVideoVisible(true), 800);
+
+    // بعد 1.5s "يوما ما" تبدأ تتقلب
+    const t1 = setTimeout(() => setFlipping(true), 1500);
+
+    // بعد 400ms من بداية القلب → غيّر للكلمات الجديدة
     const t2 = setTimeout(() => {
-      setFlipping(false);
       setPhase(1);
-      setVideoVisible(true);
-      videoRef.current?.play().catch(() => {});
-    }, 2200);
+      setFlipping(false);
+    }, 2000);
 
-    // المرحلة 2: بعد ما الفيديو اتشال شوية (2.5 ثانية) → exit
-    const t3 = setTimeout(() => {
-      setExiting(true);
-    }, 4800);
+    // بعد 2s من ظهور "Dream Team" → ابدأ الخروج
+    const t3 = setTimeout(() => setExiting(true), 4200);
 
-    // المرحلة 3: انتهى
-    const t4 = setTimeout(() => {
-      onComplete();
-    }, 5500);
+    // اكتمل
+    const t4 = setTimeout(() => onComplete(), 4900);
 
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-    };
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [onComplete]);
 
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
+        position: "fixed", inset: 0, zIndex: 99999,
         background: "#000",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: "flex", alignItems: "center", justifyContent: "center",
         overflow: "hidden",
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.7s ease-in-out" : "none",
@@ -71,34 +53,23 @@ export function IntroSequence({ onComplete }: Props) {
       <video
         ref={videoRef}
         src={VIDEO_URL}
-        muted
-        playsInline
-        loop
+        muted playsInline loop
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          opacity: videoVisible ? 0.55 : 0,
-          transition: "opacity 1.4s ease-in-out",
+          position: "absolute", inset: 0,
+          width: "100%", height: "100%", objectFit: "cover",
+          opacity: videoVisible ? 0.60 : 0,
+          transition: "opacity 1.6s ease-in-out",
           pointerEvents: "none",
         }}
       />
 
-      {/* overlay فوق الفيديو */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: videoVisible
-            ? "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.6) 100%)"
-            : "transparent",
-          transition: "background 1.4s ease-in-out",
-        }}
-      />
+      {/* overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.65) 100%)",
+      }} />
 
-      {/* النص في المنتصف */}
+      {/* النص */}
       <div style={{ position: "relative", zIndex: 2, textAlign: "center" }}>
         <WordFlip flipping={flipping} phase={phase} />
       </div>
@@ -106,72 +77,76 @@ export function IntroSequence({ onComplete }: Props) {
   );
 }
 
-/* ── مكون القلب ── */
-function WordFlip({ flipping, phase }: { flipping: boolean; phase: number }) {
-  // الكلمتين: "يوم" + "ما" تتقلبوا لـ "Dream" + "Team"
-  const word1Before = "يوم";
-  const word1After  = "Dream";
-  const word2Before = "ما";
-  const word2After  = "Team";
+/* ── VideoBackground — يُستخدم في الصفحة الرئيسية كخلفية دائمة ── */
+export function VideoBackground() {
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const showAfter = phase === 1;
+  useEffect(() => {
+    videoRef.current?.play().catch(() => {});
+  }, []);
 
   return (
+    <>
+      <video
+        ref={videoRef}
+        src={VIDEO_URL}
+        muted playsInline loop autoPlay
+        style={{
+          position: "fixed", inset: 0, zIndex: 0,
+          width: "100%", height: "100%", objectFit: "cover",
+          pointerEvents: "none",
+        }}
+      />
+      {/* overlay يخلي النص يقرأ */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 1,
+        background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 40%, rgba(0,0,0,0.65) 100%)",
+        pointerEvents: "none",
+      }} />
+    </>
+  );
+}
+
+/* ── Word Flip ── */
+function WordFlip({ flipping, phase }: { flipping: boolean; phase: number }) {
+  return (
     <div
-      dir="ltr"
+      dir="rtl"
       style={{
-        fontFamily: "'Cairo', 'Helvetica Neue', sans-serif",
-        fontWeight: 300,
-        letterSpacing: "0.08em",
-        display: "flex",
-        gap: "0.5em",
-        alignItems: "baseline",
-        justifyContent: "center",
+        fontFamily: "'Cairo', sans-serif",
+        display: "flex", gap: "0.4em",
+        alignItems: "baseline", justifyContent: "center",
+        flexDirection: "row",
       }}
     >
-      <FlipWord
-        before={word1Before}
-        after={word1After}
-        flipping={flipping}
-        showAfter={showAfter}
-        delay={0}
-      />
-      <FlipWord
-        before={word2Before}
-        after={word2After}
-        flipping={flipping}
-        showAfter={showAfter}
-        delay={80}
-      />
+      {/* الكلمة الأولى: "يوما" → "Dream" */}
+      <FlipWord before="يوما" after="Dream" flipping={flipping} phase={phase} delay={0} />
+      {/* الكلمة الثانية: "ما" → "Team" */}
+      <FlipWord before="ما" after="Team"  flipping={flipping} phase={phase} delay={100} />
     </div>
   );
 }
 
 function FlipWord({
-  before,
-  after,
-  flipping,
-  showAfter,
-  delay,
+  before, after, flipping, phase, delay,
 }: {
-  before: string;
-  after: string;
-  flipping: boolean;
-  showAfter: boolean;
-  delay: number;
+  before: string; after: string;
+  flipping: boolean; phase: number; delay: number;
 }) {
-  const [visible, setVisible] = useState(true);
-  const [current, setCurrent] = useState(before);
+  const [visible, setVisible]   = useState(true);
+  const [current, setCurrent]   = useState(before);
 
   useEffect(() => {
     if (!flipping) return;
     const t1 = setTimeout(() => setVisible(false), delay);
-    const t2 = setTimeout(() => {
-      setCurrent(after);
-      setVisible(true);
-    }, delay + 400);
+    const t2 = setTimeout(() => { setCurrent(after); setVisible(true); }, delay + 380);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [flipping, after, delay]);
+
+  // لما phase يتغير للـ before مجدداً (مش هيحصل هنا بس احتياط)
+  useEffect(() => {
+    if (phase === 0) setCurrent(before);
+  }, [phase, before]);
 
   const isAfter = current === after;
 
@@ -179,15 +154,16 @@ function FlipWord({
     <span
       style={{
         display: "inline-block",
-        fontSize: isAfter ? "clamp(2.8rem, 8vw, 5rem)" : "clamp(1.6rem, 5vw, 2.8rem)",
-        color: isAfter ? "#ffffff" : "rgba(255,255,255,0.70)",
+        fontSize: isAfter ? "clamp(3rem, 9vw, 5.5rem)" : "clamp(1.8rem, 5.5vw, 3rem)",
+        color: "#ffffff",
         fontWeight: isAfter ? 700 : 300,
-        letterSpacing: isAfter ? "0.04em" : "0.10em",
+        letterSpacing: isAfter ? "0.03em" : "0.12em",
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : flipping ? "translateY(-18px)" : "translateY(18px)",
-        transition: `opacity 0.35s ease, transform 0.35s ease, font-size 0.4s ease, color 0.4s ease`,
+        transform: visible
+          ? "translateY(0px)"
+          : flipping ? "translateY(-20px)" : "translateY(20px)",
+        transition: "opacity 0.35s ease, transform 0.35s ease, font-size 0.45s ease, font-weight 0.3s ease",
         transitionDelay: `${delay}ms`,
-        willChange: "transform, opacity",
       }}
     >
       {current}
