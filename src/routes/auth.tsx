@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { ArrowLeft, LogIn } from "lucide-react";
 
@@ -81,7 +81,7 @@ function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4">
-      <CosmicBackground density={35} />
+      <StarsBackground />
       <div className="relative z-10 w-full max-w-md">
         <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
           <ArrowLeft className="h-4 w-4 rotate-180" /> العودة للرئيسية
