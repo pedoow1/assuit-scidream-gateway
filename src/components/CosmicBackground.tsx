@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function CosmicBackground() {
+export function CosmicBackground(_props?: { scrollProgress?: number; density?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -343,7 +344,7 @@ export function CosmicBackground() {
     <canvas
       ref={canvasRef}
       className="pointer-events-none fixed inset-0"
-      style={{ zIndex: 0, display: "block" }}
+      style={{ zIndex: 0, display: "block", background: "#000010" }}
     />
   );
 }
