@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Calculator } from "lucide-react";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/gpa")({
@@ -95,7 +95,7 @@ function GpaPage() {
 
   return (
     <div className="relative min-h-screen">
-      <CosmicBackground density={22} />
+      <StarsBackground />
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
