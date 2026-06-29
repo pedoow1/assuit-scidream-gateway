@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { Loader2, Clock, XCircle, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/pending")({
@@ -63,7 +63,7 @@ function PendingPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4">
-      <CosmicBackground density={32} />
+      <StarsBackground />
       <div className="relative z-10 w-full max-w-md">
         <div className="cosmic-card rounded-3xl p-8 text-center">
           <Logo size={72} className="mx-auto" />
