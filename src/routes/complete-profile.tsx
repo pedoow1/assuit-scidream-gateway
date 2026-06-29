@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { Upload, Loader2, ArrowLeft } from "lucide-react";
 
@@ -112,7 +112,7 @@ function CompleteProfilePage() {
 
   return (
     <div className="relative min-h-screen px-4 py-10">
-      <CosmicBackground density={28} />
+      <StarsBackground />
       <div className="relative z-10 mx-auto max-w-xl">
         <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
           <ArrowLeft className="h-4 w-4 rotate-180" /> الرئيسية
