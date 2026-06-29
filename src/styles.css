@@ -50,90 +50,64 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ANIME SKY THEME — light mode = translucent glass over sky
-   Dark mode = deep night over the sky
+   DEEP SPACE THEME — pure black background, always dark
    ═══════════════════════════════════════════════════════════ */
 :root {
   --radius: 0.875rem;
 
-  /* Core palette */
-  --ink:    oklch(0.14 0.04 260);      /* deep midnight indigo */
-  --gold:   oklch(0.78 0.14 75);       /* warm star-gold */
-  --rose:   oklch(0.68 0.14 340);      /* anime pink-rose */
-  --cosmic: oklch(0.25 0.08 280);      /* deep space purple */
+  --ink:    oklch(0.14 0.04 260);
+  --gold:   oklch(0.82 0.14 75);
+  --rose:   oklch(0.72 0.14 340);
+  --cosmic: oklch(0.25 0.08 280);
 
-  /* Light mode — glass over the animated sky */
-  --background: oklch(0.97 0.008 220 / 0.35);   /* semi-transparent sky-white */
-  --foreground: oklch(0.02 0.00 0);              /* true black */
+  --background: oklch(0.10 0.04 270 / 0.65);
+  --foreground: oklch(0.96 0.01 220);          /* near-white always */
 
-  --card:             oklch(1 0 0 / 0.78);
-  --card-foreground:  oklch(0.02 0.00 0);
+  --card:             oklch(0.13 0.05 270 / 0.80);
+  --card-foreground:  oklch(0.96 0.01 220);
 
-  --popover:            oklch(0.98 0.005 220 / 0.95);
-  --popover-foreground: oklch(0.02 0.00 0);
+  --popover:            oklch(0.12 0.05 270 / 0.96);
+  --popover-foreground: oklch(0.96 0.01 220);
 
-  --primary:            oklch(0.15 0.08 265);
-  --primary-foreground: oklch(0.97 0.005 200);
+  --primary:            oklch(0.96 0.01 220);
+  --primary-foreground: oklch(0.08 0.04 270);
 
-  --secondary:            oklch(0.92 0.02 230 / 0.7);
-  --secondary-foreground: oklch(0.06 0.01 0);
+  --secondary:            oklch(0.18 0.06 270 / 0.75);
+  --secondary-foreground: oklch(0.90 0.01 220);
 
-  --muted:            oklch(0.90 0.015 225 / 0.65);
-  --muted-foreground: oklch(0.10 0.00 0);
+  --muted:            oklch(0.16 0.05 270 / 0.70);
+  --muted-foreground: oklch(0.72 0.03 240);
 
-  --accent:            oklch(0.52 0.16 55);  /* dark amber — visible on light bg */
-  --accent-foreground: oklch(0.12 0.04 80);
+  --accent:            oklch(0.80 0.16 75);    /* warm gold */
+  --accent-foreground: oklch(0.08 0.04 270);
 
   --destructive:            oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(1 0 0 / 0.28);
-  --input:  oklch(1 0 0 / 0.35);
+  --border: oklch(1 0 0 / 0.12);
+  --input:  oklch(1 0 0 / 0.15);
   --ring:   var(--gold);
 
-  /* Gradients */
   --gradient-cosmic: linear-gradient(135deg,
-    oklch(0.68 0.14 340) 0%,
-    oklch(0.78 0.14 75)  50%,
-    oklch(0.25 0.08 280) 100%);
+    oklch(0.68 0.18 300) 0%,
+    oklch(0.72 0.16 280) 40%,
+    oklch(0.78 0.14 75)  100%);
   --gradient-aurora: linear-gradient(120deg,
-    color-mix(in oklch, var(--rose)   28%, transparent),
-    color-mix(in oklch, var(--gold)   24%, transparent));
-  --gradient-trail: none; /* sky is the background — no extra trail needed */
+    color-mix(in oklch, var(--rose) 28%, transparent),
+    color-mix(in oklch, var(--gold) 24%, transparent));
+  --gradient-trail: none;
 
-  /* Shadows */
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.06),
-                 0 8px 24px -8px oklch(0.18 0.07 265 / 0.18);
-  --shadow-glow: 0 0 40px -8px color-mix(in oklch, var(--gold) 50%, transparent);
+  --shadow-soft: 0 2px 8px oklch(0 0 0 / 0.4),
+                 0 8px 32px -8px oklch(0.18 0.07 265 / 0.35);
+  --shadow-glow: 0 0 40px -8px color-mix(in oklch, var(--gold) 60%, transparent);
   --shadow-rose: 0 0 60px -16px color-mix(in oklch, var(--rose) 55%, transparent);
 }
 
-/* ── Night mode (auto dark) ── */
+/* ── Always dark — same vars, kept for compatibility ── */
 .dark {
-  --background: oklch(0.10 0.04 265 / 0.75);
-  --foreground: oklch(0.95 0.01 220);
-
-  --card:             oklch(0.14 0.05 265 / 0.72);
-  --card-foreground:  oklch(0.95 0.01 220);
-
-  --popover:            oklch(0.13 0.05 265 / 0.95);
-  --popover-foreground: oklch(0.95 0.01 220);
-
-  --primary:            oklch(0.95 0.01 220);
-  --primary-foreground: oklch(0.10 0.04 265);
-
-  --secondary:            oklch(0.20 0.06 265 / 0.7);
-  --secondary-foreground: oklch(0.95 0.01 220);
-
-  --muted:            oklch(0.18 0.05 265 / 0.65);
-  --muted-foreground: oklch(0.72 0.03 230);
-
-  --accent:            var(--gold);
-  --accent-foreground: oklch(0.10 0.04 265);
-
-  --border: oklch(1 0 0 / 0.12);
-  --input:  oklch(1 0 0 / 0.14);
-  --ring:   var(--gold);
+  --muted-foreground: oklch(0.75 0.03 240);
+  --border: oklch(1 0 0 / 0.14);
+  --input:  oklch(1 0 0 / 0.18);
 }
 
 @layer base {
@@ -180,14 +154,15 @@
   box-shadow: var(--shadow-rose);
 }
 
-/* Glass card — looks beautiful over the sky */
+/* Glass card — dark glass over space background */
 @utility cosmic-card {
-  background-color: color-mix(in oklch, var(--card) 92%, transparent);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  border: 1px solid color-mix(in oklch, white 40%, var(--border));
+  background-color: color-mix(in oklch, oklch(0.10 0.05 270) 85%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid oklch(1 0 0 / 0.10);
   box-shadow: var(--shadow-soft),
-              inset 0 1px 0 oklch(1 0 0 / 0.22);
+              inset 0 1px 0 oklch(1 0 0 / 0.08),
+              0 0 0 0.5px oklch(1 0 0 / 0.05);
 }
 
 /* ── Animations ── */
