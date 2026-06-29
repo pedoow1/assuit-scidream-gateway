@@ -118,7 +118,7 @@
     direction: rtl;
   }
   body {
-    background-color: transparent; /* sky shows through */
+    background-color: #000000;
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
