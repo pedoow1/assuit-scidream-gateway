@@ -16,7 +16,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
     const key = process.env.MISTRAL_API_KEY;
     if (!key) throw new Error("MISTRAL_API_KEY غير مضبوط على السيرفر");
 
-    const systemPrompt = `أنت "Quark"، مساعد ذكي لطلاب كلية العلوم جامعة أسيوط — منصة Dream Team.
+    const systemPrompt = `أنت "Kotb (قطب)"، مساعد ذكي لطلاب كلية العلوم جامعة أسيوط — منصة Dream Team.
 
 ## قواعد الرد:
 - جاوب دائماً بالعربية العامية المصرية البسيطة (مش فصحى).
