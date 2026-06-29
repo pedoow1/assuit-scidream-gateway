@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2, ArrowLeft, Plus, Brain, Clock, Trash2, Edit, Eye, EyeOff, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 
 export const Route = createFileRoute("/subjects/$subjectId/quizzes/")({
   head: () => ({ meta: [{ title: "اختبارات المادة — Assuit SciDream" }] }),
@@ -77,7 +77,7 @@ function QuizzesListPage() {
 
   return (
     <div className="relative min-h-screen">
-      <CosmicBackground density={22} />
+      <StarsBackground />
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/subjects/$subjectId" params={{ subjectId }} className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
