@@ -248,7 +248,7 @@ function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClos
           <select className="modal-input" value={semester} onChange={(e) => setSemester(Number(e.target.value))}>
             <option value={1}>الفصل الأول</option><option value={2}>الفصل الثاني</option>
           </select>
-          <input type="number" min={1} max={6} className="modal-input" value={creditHours ?? 3} onChange={(e) => setCreditHours(Number(e.target.value))} />
+          <input type="number" min={0} max={6} className="modal-input" value={creditHours ?? 3} onChange={(e) => setCreditHours(Number(e.target.value))} />
           <textarea className="modal-input sm:col-span-2" placeholder="وصف مختصر (اختياري)" rows={2} value={description ?? ""} onChange={(e) => setDescription(e.target.value)} />
           <button type="submit" disabled={saving} className="sm:col-span-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {saving ? "جاري الحفظ..." : isEdit ? "حفظ التعديل" : "حفظ"}
