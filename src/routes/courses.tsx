@@ -4,7 +4,7 @@ import { Loader2, ArrowLeft, GraduationCap, Download, Trash2, Upload } from "luc
 import { toast } from "sonner";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/courses")({
@@ -113,7 +113,7 @@ function CoursesPage() {
 
   return (
     <div className="relative min-h-screen" dir="rtl">
-      <CosmicBackground density={22} />
+      <StarsBackground />
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
