@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, FileText, Loader2, Plus, Trash2, Save } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 
 export const Route = createFileRoute("/notes")({
   head: () => ({ meta: [{ title: "ملاحظاتي — Assuit SciDream" }] }),
@@ -76,7 +76,7 @@ function NotesPage() {
 
   return (
     <div className="relative min-h-screen" dir="rtl">
-      <CosmicBackground density={18} />
+      <StarsBackground />
       <main className="relative z-10 mx-auto max-w-6xl px-6 py-8">
         <header className="mb-6 flex items-center justify-between">
           <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent">
