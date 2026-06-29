@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -30,7 +30,7 @@ function AuthCallback() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-      <CosmicBackground density={30} />
+      <StarsBackground />
       <div className="relative z-10 flex flex-col items-center gap-6 text-center">
         <Logo size={72} className="animate-pulse" />
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent border-t-transparent" />
