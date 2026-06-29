@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2, ClipboardList } from "lucide-react";
 import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/admin")({
@@ -43,7 +43,7 @@ function AdminPage() {
 
   return (
     <div className="relative min-h-screen">
-      <CosmicBackground density={20} />
+      <StarsBackground />
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
