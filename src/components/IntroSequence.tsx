@@ -86,33 +86,82 @@ export function StarsBackground() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let W = 0, H = 0, raf = 0, t = 0;
+
     const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
     resize();
     window.addEventListener("resize", resize);
-    const STARS = Array.from({ length: 180 }, (_, i) => ({
-      x: Math.abs(Math.sin(i * 137.5)) ,
-      y: Math.abs(Math.sin(i * 97.3)),
-      r: Math.abs(Math.sin(i * 73.1)) * 1.2 + 0.3,
-      spd: Math.abs(Math.sin(i * 53.7)) * 2 + 1.5,
-      del: Math.abs(Math.sin(i * 31.4)) * 6,
-    }));
+
+    const sv = (i: number, m: number) => Math.abs(Math.sin(i * m));
+
+    const STARS = Array.from({ length: 260 }, (_, i) => {
+      const big    = i < 12;
+      const medium = i < 60;
+      return {
+        x:   sv(i, 137.508),
+        y:   sv(i, 97.321),
+        r:   big    ? sv(i, 73.1) * 1.8 + 1.2
+           : medium ? sv(i, 73.1) * 0.9 + 0.5
+           :          sv(i, 73.1) * 0.4 + 0.15,
+        spd: big    ? sv(i, 53.7) * 1.2 + 0.8
+           : medium ? sv(i, 53.7) * 2.5 + 1.5
+           :          sv(i, 53.7) * 4.0 + 2.5,
+        del: sv(i, 31.4) * Math.PI * 2,
+        hue: i % 9 === 0 ? 220 : i % 7 === 0 ? 45 : 0,
+        big, medium,
+      };
+    });
+
     function draw() {
-      t += 0.008;
+      t += 0.006;
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, W, H);
+
       STARS.forEach(s => {
-        const op = 0.15 + 0.65 * (0.5 + 0.5 * Math.sin(t / s.spd + s.del));
+        const tw = 0.5 + 0.5 * Math.sin(t / s.spd + s.del);
+        const op = s.big    ? 0.35 + 0.65 * tw
+                 : s.medium ? 0.10 + 0.65 * tw
+                 :            0.04 + 0.40 * tw;
+        const px = s.x * W;
+        const py = s.y * H;
+        const col = s.hue === 220 ? `rgba(180,200,255,${op})`
+                  : s.hue === 45  ? `rgba(255,240,180,${op})`
+                  :                 `rgba(255,255,255,${op})`;
+
+        // glow للنجوم الكبيرة
+        if (s.big) {
+          const g = ctx.createRadialGradient(px, py, 0, px, py, s.r * 6);
+          g.addColorStop(0, `rgba(255,255,255,${op * 0.3})`);
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.beginPath(); ctx.arc(px, py, s.r * 6, 0, Math.PI * 2);
+          ctx.fillStyle = g; ctx.fill();
+
+          // وميض صليبي لما النجمة في أوج لمعانها
+          if (tw > 0.80) {
+            const len = s.r * 5 * (tw - 0.80) * 5;
+            ctx.save();
+            ctx.globalAlpha = (tw - 0.80) * 3;
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 0.6;
+            ctx.beginPath(); ctx.moveTo(px - len, py); ctx.lineTo(px + len, py); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(px, py - len); ctx.lineTo(px, py + len); ctx.stroke();
+            ctx.restore();
+          }
+        }
+
         ctx.beginPath();
-        ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${op})`;
+        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = col;
         ctx.fill();
       });
+
       raf = requestAnimationFrame(draw);
     }
+
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
   }, []);
+
   return (
     <canvas
       ref={canvasRef}
