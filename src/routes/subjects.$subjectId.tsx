@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { extractYouTubeId } from "@/lib/youtube";
 
@@ -126,7 +126,7 @@ function SubjectDetailPage() {
 
   return (
     <div className="relative min-h-screen">
-      <CosmicBackground density={22} />
+      <StarsBackground />
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
