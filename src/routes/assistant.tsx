@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Send, Sparkles, ArrowRight, Trash2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
-import { CosmicBackground } from "@/components/CosmicBackground";
+import { StarsBackground } from "@/components/IntroSequence";
 import { chatWithAssistant, type ChatMessage } from "@/lib/assistant.functions";
 
 export const Route = createFileRoute("/assistant")({
@@ -49,7 +49,7 @@ function AssistantPage() {
 
   return (
     <div className="relative min-h-screen" dir="rtl">
-      <CosmicBackground density={20} />
+      <StarsBackground />
       <main className="relative z-10 mx-auto flex h-screen max-w-3xl flex-col px-4 py-6">
         <header className="mb-4 flex items-center justify-between">
           <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent">
