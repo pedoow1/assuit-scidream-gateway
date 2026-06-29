@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
+import { IntroSequence } from "@/components/IntroSequence";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowLeft, ShieldCheck, BookOpen, Target, Eye, Users, GraduationCap, FlaskConical, Globe, X, Send, Loader2 } from "lucide-react";
 import { CosmicBackground } from "@/components/CosmicBackground";
@@ -44,6 +45,18 @@ const GOALS = [
 function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [introComplete, setIntroComplete] = useState(false);
+
+  // لو الـ intro اتشاف قبل في نفس الـ session، متظهرش تاني
+  useEffect(() => {
+    const seen = sessionStorage.getItem("intro_seen");
+    if (seen) setIntroComplete(true);
+  }, []);
+
+  const handleIntroComplete = () => {
+    sessionStorage.setItem("intro_seen", "1");
+    setIntroComplete(true);
+  };
 
   useEffect(() => {
     const onScroll = () => {
@@ -57,6 +70,17 @@ function LandingPage() {
 
   return (
     <div ref={containerRef} className="relative min-h-screen overflow-hidden" dir="rtl">
+
+      {/* Intro sequence — بتظهر مرة واحدة بس في كل session */}
+      {!introComplete && <IntroSequence onComplete={handleIntroComplete} />}
+
+      {/* الصفحة بتظهر بعد الـ intro */}
+      <div
+        style={{
+          opacity: introComplete ? 1 : 0,
+          transition: "opacity 0.6s ease-in-out",
+        }}
+      >
 
       <CosmicBackground scrollProgress={scrollProgress} />
 
@@ -82,11 +106,55 @@ function LandingPage() {
 
       {/* Hero */}
       <section className="relative z-10 mx-auto max-w-7xl px-6 pt-8 pb-16 text-center">
+
+        {/* Decorative orbit ring behind logo */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2"
+          style={{
+            width: 340, height: 340,
+            opacity: Math.max(0, 1 - scrollProgress * 4),
+            transform: `translateX(-50%) rotate(${scrollProgress * 80}deg)`,
+          }}
+        >
+          {/* outer ring */}
+          <div style={{
+            position:"absolute", inset:0, borderRadius:"50%",
+            border:"1px solid rgba(255,255,255,0.07)",
+          }} />
+          {/* middle ring */}
+          <div style={{
+            position:"absolute", inset:40, borderRadius:"50%",
+            border:"1px dashed rgba(167,139,250,0.14)",
+          }} />
+          {/* orbiting dot */}
+          <div style={{
+            position:"absolute", top:"50%", left:"50%",
+            width:8, height:8, borderRadius:"50%",
+            background:"rgba(251,191,36,0.70)",
+            boxShadow:"0 0 12px 4px rgba(251,191,36,0.4)",
+            transform:`translateX(-50%) translateY(-50%) rotate(${scrollProgress * -180}deg) translateX(148px)`,
+            transition:"transform 0.05s linear",
+          }} />
+          {/* second orbiting dot */}
+          <div style={{
+            position:"absolute", top:"50%", left:"50%",
+            width:5, height:5, borderRadius:"50%",
+            background:"rgba(129,140,248,0.80)",
+            boxShadow:"0 0 8px 3px rgba(129,140,248,0.4)",
+            transform:`translateX(-50%) translateY(-50%) rotate(${scrollProgress * 240 + 120}deg) translateX(110px)`,
+            transition:"transform 0.05s linear",
+          }} />
+        </div>
+
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="mx-auto"
+          style={{
+            transform: `translateY(${scrollProgress * -40}px) scale(${1 - scrollProgress * 0.08})`,
+            opacity: Math.max(0.3, 1 - scrollProgress * 1.8),
+          }}
         >
           <Logo size={160} className="mx-auto drop-shadow-2xl" />
         </motion.div>
@@ -154,7 +222,13 @@ function LandingPage() {
 
       {/* Vision & Mission */}
       <section id="vision" className="relative z-10 mx-auto max-w-6xl px-6 py-10">
-        <div className="cosmic-card rounded-3xl p-8 md:p-12">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7 }}
+          className="cosmic-card rounded-3xl p-8 md:p-12"
+        >
           <div className="mb-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-widest text-accent">عن الكلية</div>
             <h2 className="mt-2 font-display text-3xl md:text-4xl">الرؤية والرسالة</h2>
@@ -182,7 +256,7 @@ function LandingPage() {
               </ul>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Goals */}
@@ -546,6 +620,7 @@ function LandingPage() {
 
       {/* Floating Fortune Cookie Bubble */}
       <Fortunecookie />
+      </div>{/* end fade wrapper */}
     </div>
   );
 }
