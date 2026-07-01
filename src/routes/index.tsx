@@ -320,6 +320,7 @@ function LandingPage() {
               { name: "جيولوجيا بترول", note: null },
               { name: "بايو تكنولوجي", note: null },
               { name: "الفيزياء الإشعاعية الطبية", note: "بداية من سنة أولى فقط" },
+              { name: "علوم المواد والنانو تكنولوجي", note: null },
             ].map((d) => (
               <div key={d.name} className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3">
                 <span className="mt-0.5 h-2 w-2 rounded-full bg-accent shrink-0" />
