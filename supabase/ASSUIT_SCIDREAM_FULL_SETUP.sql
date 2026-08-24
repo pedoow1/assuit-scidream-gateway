@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'public'::regnamespace AND typname = 'app_role') THEN
-    CREATE TYPE public.app_role AS ENUM ('super_admin', 'admin', 'student');
+    CREATE TYPE public.app_role AS ENUM ('super_admin', 'admin', 'student', 'department_advisor', 'instructor');
   END IF;
 END $$;
 
@@ -519,5 +519,321 @@ SELECT
   END
 FROM auth.users u
 ON CONFLICT (user_id, role) DO NOTHING;
+
+-- ============================================================================
+-- Industrial Chemistry department module (قسم الكيمياء الصناعية)
+-- ============================================================================
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_title text;
+
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS instructor_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS instructor_name text;
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS prerequisite_codes text[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS is_department_gated boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS public.announcements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  title text NOT NULL,
+  body text NOT NULL,
+  pinned boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'announcements' AND policyname = 'announcements_read_all_auth') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcements TO authenticated;
+    GRANT ALL ON public.announcements TO service_role;
+    ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "announcements_read_all_auth" ON public.announcements FOR SELECT TO authenticated USING (true);
+    CREATE POLICY "announcements_admin_write" ON public.announcements FOR ALL TO authenticated
+      USING (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin'))
+      WITH CHECK (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin'));
+    DROP TRIGGER IF EXISTS announcements_touch ON public.announcements;
+    CREATE TRIGGER announcements_touch BEFORE UPDATE ON public.announcements
+      FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+  END IF;
+END $$;
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS image_url text;
+
+CREATE TABLE IF NOT EXISTS public.department_applications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  department text NOT NULL DEFAULT 'الكيمياء الصناعية',
+  full_name text NOT NULL,
+  email text NOT NULL,
+  phone text NOT NULL,
+  academic_id text,
+  academic_year text,
+  notes text,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS department_applications_user_idx ON public.department_applications(user_id);
+CREATE INDEX IF NOT EXISTS department_applications_status_idx ON public.department_applications(status);
+
+CREATE TABLE IF NOT EXISTS public.department_registrations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subject_id uuid NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'pending_advisor'
+    CHECK (status IN ('pending_advisor', 'approved', 'needs_receipt', 'paid', 'rejected', 'expired')),
+  priority integer NOT NULL DEFAULT 0,
+  priority_edit_count integer NOT NULL DEFAULT 0,
+  reviewed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (student_id, subject_id)
+);
+CREATE INDEX IF NOT EXISTS department_registrations_student_idx ON public.department_registrations(student_id);
+CREATE INDEX IF NOT EXISTS department_registrations_subject_idx ON public.department_registrations(subject_id);
+
+DROP TRIGGER IF EXISTS department_registrations_touch ON public.department_registrations;
+CREATE TRIGGER department_registrations_touch
+BEFORE UPDATE ON public.department_registrations
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE OR REPLACE FUNCTION public.guard_priority_edit_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.priority IS DISTINCT FROM OLD.priority THEN
+    IF OLD.priority_edit_count >= 3 THEN
+      RAISE EXCEPTION 'وصلت للحد الأقصى لعدد مرات تعديل الترتيب (3 مرات)';
+    END IF;
+    NEW.priority_edit_count := OLD.priority_edit_count + 1;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS department_registrations_priority_guard ON public.department_registrations;
+CREATE TRIGGER department_registrations_priority_guard
+BEFORE UPDATE ON public.department_registrations
+FOR EACH ROW
+WHEN (auth.uid() = NEW.student_id)
+EXECUTE FUNCTION public.guard_priority_edit_limit();
+
+CREATE TABLE IF NOT EXISTS public.department_payment_receipts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  registration_id uuid NOT NULL REFERENCES public.department_registrations(id) ON DELETE CASCADE,
+  student_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  file_url text NOT NULL,
+  status text NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'confirmed', 'rejected')),
+  uploaded_at timestamptz NOT NULL DEFAULT now(),
+  confirmed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  confirmed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS department_receipts_registration_idx ON public.department_payment_receipts(registration_id);
+CREATE INDEX IF NOT EXISTS department_receipts_student_idx ON public.department_payment_receipts(student_id);
+
+CREATE TABLE IF NOT EXISTS public.department_grades (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subject_id uuid NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
+  grade text,
+  points numeric,
+  uploaded_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (student_id, subject_id)
+);
+DROP TRIGGER IF EXISTS department_grades_touch ON public.department_grades;
+CREATE TRIGGER department_grades_touch
+BEFORE UPDATE ON public.department_grades
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE OR REPLACE FUNCTION public.is_department_member(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.department_applications
+    WHERE user_id = _user_id AND status = 'approved'
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION public.is_department_member(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_department_member(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_subject_instructor(_user_id uuid, _subject_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.subjects
+    WHERE id = _subject_id AND instructor_id = _user_id
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION public.is_subject_instructor(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_subject_instructor(uuid, uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.expire_overdue_department_receipts()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, private
+AS $$
+DECLARE
+  affected_students uuid[];
+  affected_count integer;
+BEGIN
+  IF NOT (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor')) THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  SELECT array_agg(DISTINCT student_id) INTO affected_students
+  FROM public.department_registrations r
+  WHERE r.status IN ('approved', 'needs_receipt')
+    AND r.created_at < now() - interval '7 days'
+    AND NOT EXISTS (SELECT 1 FROM public.department_payment_receipts p WHERE p.registration_id = r.id);
+
+  UPDATE public.department_registrations
+  SET status = 'expired'
+  WHERE status IN ('approved', 'needs_receipt')
+    AND created_at < now() - interval '7 days'
+    AND NOT EXISTS (SELECT 1 FROM public.department_payment_receipts p WHERE p.registration_id = department_registrations.id);
+  GET DIAGNOSTICS affected_count = ROW_COUNT;
+
+  IF affected_students IS NOT NULL THEN
+    UPDATE public.department_applications
+    SET status = 'rejected', reviewed_at = now()
+    WHERE user_id = ANY(affected_students) AND status = 'approved';
+  END IF;
+
+  RETURN affected_count;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.expire_overdue_department_receipts() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.expire_overdue_department_receipts() TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE ON public.department_applications TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.department_registrations TO authenticated;
+GRANT SELECT, INSERT ON public.department_payment_receipts TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.department_grades TO authenticated;
+GRANT ALL ON public.department_applications, public.department_registrations,
+  public.department_payment_receipts, public.department_grades TO service_role;
+
+ALTER TABLE public.department_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.department_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.department_payment_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.department_grades ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "dept_apps_select_own_or_staff" ON public.department_applications;
+CREATE POLICY "dept_apps_select_own_or_staff" ON public.department_applications
+FOR SELECT TO authenticated
+USING (auth.uid() = user_id OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'));
+
+DROP POLICY IF EXISTS "dept_apps_insert_own" ON public.department_applications;
+CREATE POLICY "dept_apps_insert_own" ON public.department_applications
+FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "dept_apps_update_staff" ON public.department_applications;
+CREATE POLICY "dept_apps_update_staff" ON public.department_applications
+FOR UPDATE TO authenticated
+USING (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'))
+WITH CHECK (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'));
+
+DROP POLICY IF EXISTS "dept_regs_select_own_or_staff" ON public.department_registrations;
+CREATE POLICY "dept_regs_select_own_or_staff" ON public.department_registrations
+FOR SELECT TO authenticated
+USING (
+  auth.uid() = student_id
+  OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor')
+  OR public.is_subject_instructor(auth.uid(), subject_id)
+);
+
+DROP POLICY IF EXISTS "dept_regs_insert_own" ON public.department_registrations;
+CREATE POLICY "dept_regs_insert_own" ON public.department_registrations
+FOR INSERT TO authenticated WITH CHECK (auth.uid() = student_id AND public.is_department_member(auth.uid()));
+
+DROP POLICY IF EXISTS "dept_regs_update_own_or_staff" ON public.department_registrations;
+CREATE POLICY "dept_regs_update_own_or_staff" ON public.department_registrations
+FOR UPDATE TO authenticated
+USING (auth.uid() = student_id OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'))
+WITH CHECK (auth.uid() = student_id OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'));
+
+DROP POLICY IF EXISTS "dept_receipts_select_own_or_staff" ON public.department_payment_receipts;
+CREATE POLICY "dept_receipts_select_own_or_staff" ON public.department_payment_receipts
+FOR SELECT TO authenticated
+USING (auth.uid() = student_id OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'));
+
+DROP POLICY IF EXISTS "dept_receipts_insert_own" ON public.department_payment_receipts;
+CREATE POLICY "dept_receipts_insert_own" ON public.department_payment_receipts
+FOR INSERT TO authenticated
+WITH CHECK (
+  auth.uid() = student_id
+  AND EXISTS (SELECT 1 FROM public.department_registrations r WHERE r.id = registration_id AND r.student_id = auth.uid())
+);
+
+DROP POLICY IF EXISTS "dept_receipts_update_staff" ON public.department_payment_receipts;
+CREATE POLICY "dept_receipts_update_staff" ON public.department_payment_receipts
+FOR UPDATE TO authenticated
+USING (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'))
+WITH CHECK (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor'));
+
+DROP POLICY IF EXISTS "dept_grades_select_own_or_staff" ON public.department_grades;
+CREATE POLICY "dept_grades_select_own_or_staff" ON public.department_grades
+FOR SELECT TO authenticated
+USING (
+  auth.uid() = student_id
+  OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor')
+  OR public.is_subject_instructor(auth.uid(), subject_id)
+);
+
+DROP POLICY IF EXISTS "dept_grades_write_instructor" ON public.department_grades;
+CREATE POLICY "dept_grades_write_instructor" ON public.department_grades
+FOR ALL TO authenticated
+USING (public.is_subject_instructor(auth.uid(), subject_id) OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin'))
+WITH CHECK (public.is_subject_instructor(auth.uid(), subject_id) OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin'));
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('department-receipts', 'department-receipts', false, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf']::text[])
+ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "dept_receipts_upload_own" ON storage.objects;
+CREATE POLICY "dept_receipts_upload_own" ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'department-receipts' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "dept_receipts_read_own_or_staff" ON storage.objects;
+CREATE POLICY "dept_receipts_read_own_or_staff" ON storage.objects
+FOR SELECT TO authenticated
+USING (
+  bucket_id = 'department-receipts'
+  AND (
+    (storage.foldername(name))[1] = auth.uid()::text
+    OR private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin') OR private.has_role(auth.uid(), 'department_advisor')
+  )
+);
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('announcement-images', 'announcement-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp']::text[])
+ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "announcement_images_public_read" ON storage.objects;
+CREATE POLICY "announcement_images_public_read" ON storage.objects
+FOR SELECT TO authenticated, anon USING (bucket_id = 'announcement-images');
+
+DROP POLICY IF EXISTS "announcement_images_admin_write" ON storage.objects;
+CREATE POLICY "announcement_images_admin_write" ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'announcement-images' AND (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin')));
+
+DROP POLICY IF EXISTS "announcement_images_admin_update" ON storage.objects;
+CREATE POLICY "announcement_images_admin_update" ON storage.objects
+FOR UPDATE TO authenticated
+USING (bucket_id = 'announcement-images' AND (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin')));
+
+DROP POLICY IF EXISTS "announcement_images_admin_delete" ON storage.objects;
+CREATE POLICY "announcement_images_admin_delete" ON storage.objects
+FOR DELETE TO authenticated
+USING (bucket_id = 'announcement-images' AND (private.has_role(auth.uid(), 'admin') OR private.has_role(auth.uid(), 'super_admin')));
 
 COMMIT;
