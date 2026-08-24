@@ -469,10 +469,8 @@ function LandingPage() {
         {/* College Leadership */}
         <div className="mb-6">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">قيادة الكلية</div>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 max-w-md mx-auto">
             {[
-              { name: "أ.د أبو بكر محمد الطيب", role: "عميد الكلية", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0021.jpg" },
-              { name: "أ.د محمد أبو العيون", role: "وكيل الكلية لشئون تعليم الطلاب", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0022.jpg" },
               { name: "أ.د فاطمة الزهراء عبدالحميد", role: "المشرفة الأكاديمية على الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260628-WA0034.jpg" },
             ].map((p) => (
               <motion.div
