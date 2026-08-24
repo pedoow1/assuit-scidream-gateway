@@ -20,6 +20,7 @@ export type Database = {
           body: string
           created_at: string
           id: string
+          image_url: string | null
           pinned: boolean
           title: string
           updated_at: string
@@ -29,6 +30,7 @@ export type Database = {
           body: string
           created_at?: string
           id?: string
+          image_url?: string | null
           pinned?: boolean
           title: string
           updated_at?: string
@@ -38,11 +40,189 @@ export type Database = {
           body?: string
           created_at?: string
           id?: string
+          image_url?: string | null
           pinned?: boolean
           title?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      department_applications: {
+        Row: {
+          academic_id: string | null
+          academic_year: string | null
+          created_at: string
+          department: string
+          email: string
+          full_name: string
+          id: string
+          notes: string | null
+          phone: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          academic_id?: string | null
+          academic_year?: string | null
+          created_at?: string
+          department?: string
+          email: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          phone: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          academic_id?: string | null
+          academic_year?: string | null
+          created_at?: string
+          department?: string
+          email?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          phone?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      department_registrations: {
+        Row: {
+          created_at: string
+          id: string
+          priority: number
+          priority_edit_count: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          student_id: string
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          priority?: number
+          priority_edit_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          student_id: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          priority?: number
+          priority_edit_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          student_id?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_registrations_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      department_payment_receipts: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          file_url: string
+          id: string
+          registration_id: string
+          status: string
+          student_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          file_url: string
+          id?: string
+          registration_id: string
+          status?: string
+          student_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          file_url?: string
+          id?: string
+          registration_id?: string
+          status?: string
+          student_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_payment_receipts_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "department_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      department_grades: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          points: number | null
+          student_id: string
+          subject_id: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          points?: number | null
+          student_id: string
+          subject_id: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          points?: number | null
+          student_id?: string
+          subject_id?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_grades_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_items: {
         Row: {
@@ -175,6 +355,7 @@ export type Database = {
           avatar_url: string | null
           batch_year: number | null
           created_at: string
+          display_title: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -190,6 +371,7 @@ export type Database = {
           avatar_url?: string | null
           batch_year?: number | null
           created_at?: string
+          display_title?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -205,6 +387,7 @@ export type Database = {
           avatar_url?: string | null
           batch_year?: number | null
           created_at?: string
+          display_title?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -365,8 +548,12 @@ export type Database = {
           department: string
           description: string | null
           id: string
+          instructor_id: string | null
+          instructor_name: string | null
+          is_department_gated: boolean
           name_ar: string
           name_en: string | null
+          prerequisite_codes: string[]
           semester: number
           updated_at: string
           year: number
@@ -380,8 +567,12 @@ export type Database = {
           department: string
           description?: string | null
           id?: string
+          instructor_id?: string | null
+          instructor_name?: string | null
+          is_department_gated?: boolean
           name_ar: string
           name_en?: string | null
+          prerequisite_codes?: string[]
           semester: number
           updated_at?: string
           year: number
@@ -395,8 +586,12 @@ export type Database = {
           department?: string
           description?: string | null
           id?: string
+          instructor_id?: string | null
+          instructor_name?: string | null
+          is_department_gated?: boolean
           name_ar?: string
           name_en?: string | null
+          prerequisite_codes?: string[]
           semester?: number
           updated_at?: string
           year?: number
@@ -475,9 +670,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_department_member: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_subject_instructor: {
+        Args: { _subject_id: string; _user_id: string }
+        Returns: boolean
+      }
+      expire_overdue_department_receipts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
     }
     Enums: {
-      app_role: "super_admin" | "admin" | "student"
+      app_role: "super_admin" | "admin" | "student" | "department_advisor" | "instructor"
       question_type: "mcq" | "true_false" | "essay"
     }
     CompositeTypes: {
@@ -606,7 +813,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "admin", "student"],
+      app_role: ["super_admin", "admin", "student", "department_advisor", "instructor"],
       question_type: ["mcq", "true_false", "essay"],
     },
   },
