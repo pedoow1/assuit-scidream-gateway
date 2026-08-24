@@ -14,9 +14,10 @@ export interface ProfileRow {
   rejection_reason: string | null;
   batch_year: number | null;
   avatar_url: string | null;
+  display_title: string | null;
 }
 
-export type AppRole = "super_admin" | "admin" | "student";
+export type AppRole = "super_admin" | "admin" | "student" | "department_advisor" | "instructor";
 
 const SUPER_ADMIN_EMAIL = "abdalahkotp31@gmail.com";
 
@@ -95,9 +96,10 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
       ]);
       if (rolesError) throw rolesError;
       const loadedRoles = (roleRows ?? []).map((r) => r.role as AppRole);
-      const roles = superAdmin && !loadedRoles.includes("super_admin")
-        ? ["super_admin" as AppRole, ...loadedRoles]
-        : loadedRoles;
+      const roles =
+        superAdmin && !loadedRoles.includes("super_admin")
+          ? ["super_admin" as AppRole, ...loadedRoles]
+          : loadedRoles;
       setState({
         session,
         user: session.user,
@@ -117,7 +119,8 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
       if (mounted) setState((current) => ({ ...current, loading: false }));
     }, 8000);
 
-    supabase.auth.getSession()
+    supabase.auth
+      .getSession()
       .then(({ data }) => {
         if (!mounted) return;
         window.clearTimeout(fallbackTimer);
@@ -125,7 +128,8 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
       })
       .catch((error) => {
         console.error("[auth] getSession failed", error);
-        if (mounted) setState({ session: null, user: null, profile: null, roles: [], loading: false });
+        if (mounted)
+          setState({ session: null, user: null, profile: null, roles: [], loading: false });
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
@@ -153,4 +157,23 @@ export function useAuth(): AuthState & { refresh: () => Promise<void> } {
 
 export function isAdminRole(roles: AppRole[]) {
   return roles.includes("admin") || roles.includes("super_admin");
+}
+
+export function isDepartmentStaffRole(roles: AppRole[]) {
+  return isAdminRole(roles) || roles.includes("department_advisor");
+}
+
+export function isInstructorRole(roles: AppRole[]) {
+  return roles.includes("instructor") || isAdminRole(roles);
+}
+
+/** Label to show next to a person's name: their custom display_title if set,
+ * otherwise a sensible default for their highest role. */
+export function displayTitleFor(profile: ProfileRow | null, roles: AppRole[]) {
+  if (profile?.display_title?.trim()) return profile.display_title.trim();
+  if (roles.includes("super_admin")) return "Super Admin";
+  if (roles.includes("department_advisor")) return "المشرف الأكاديمي";
+  if (roles.includes("instructor")) return "د.";
+  if (roles.includes("admin")) return "Admin";
+  return null;
 }
