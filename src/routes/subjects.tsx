@@ -13,7 +13,16 @@ export const Route = createFileRoute("/subjects")({
   component: SubjectsPage,
 });
 
-const DEPARTMENTS = ["الكل", "الرياضيات", "الفيزياء", "الكيمياء", "الجيولوجيا", "النبات والميكروبيولوجي", "علم الحيوان"];
+const DEPARTMENTS = [
+  "الكل",
+  "الرياضيات",
+  "الفيزياء",
+  "الكيمياء",
+  "الجيولوجيا",
+  "النبات والميكروبيولوجي",
+  "علم الحيوان",
+  "الكيمياء الصناعية",
+];
 const YEARS = [0, 1, 2, 3, 4] as const;
 
 interface Subject {
@@ -27,6 +36,8 @@ interface Subject {
   credit_hours: number | null;
   description: string | null;
   cover_url: string | null;
+  instructor_name: string | null;
+  prerequisite_codes: string[] | null;
 }
 
 function SubjectsPage() {
@@ -42,7 +53,12 @@ function SubjectsPage() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
   async function deleteSubject(id: string) {
-    if (!confirm("متأكد إنك عايز تمسح المادة؟ هتمسح كل الفولدرات والمحتوى والاختبارات اللي جواها كمان.")) return;
+    if (
+      !confirm(
+        "متأكد إنك عايز تمسح المادة؟ هتمسح كل الفولدرات والمحتوى والاختبارات اللي جواها كمان.",
+      )
+    )
+      return;
     const { error } = await supabase.from("subjects").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("اتمسحت المادة");
@@ -52,13 +68,18 @@ function SubjectsPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/auth" });
-    else if (profile && profile.verification_status !== "verified" && !isAdmin) navigate({ to: "/pending" });
+    else if (profile && profile.verification_status !== "verified" && !isAdmin)
+      navigate({ to: "/pending" });
   }, [user, profile, loading, isAdmin, navigate]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["subjects"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subjects").select("*").order("year").order("name_ar");
+      const { data, error } = await supabase
+        .from("subjects")
+        .select("*")
+        .order("year")
+        .order("name_ar");
       if (error) throw error;
       return data as Subject[];
     },
@@ -69,13 +90,18 @@ function SubjectsPage() {
     return (data ?? []).filter((s) => {
       if (dept !== "الكل" && s.department !== dept) return false;
       if (year !== 0 && s.year !== year) return false;
-      if (q && !`${s.name_ar} ${s.name_en} ${s.code}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (q && !`${s.name_ar} ${s.name_en} ${s.code}`.toLowerCase().includes(q.toLowerCase()))
+        return false;
       return true;
     });
   }, [data, dept, year, q]);
 
   if (loading || !user) {
-    return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
   }
 
   return (
@@ -84,13 +110,18 @@ function SubjectsPage() {
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4 rotate-180" /> الرجوع
           </Link>
           <div className="flex items-center gap-3">
             <BookOpen className="h-5 w-5 text-accent" />
             <div>
-              <div className="font-display text-base font-semibold leading-tight">المواد الدراسية</div>
+              <div className="font-display text-base font-semibold leading-tight">
+                المواد الدراسية
+              </div>
               <div className="text-[10px] text-muted-foreground">كل المحتوى منظم في مكان واحد</div>
             </div>
             <Logo size={36} />
@@ -109,12 +140,26 @@ function SubjectsPage() {
               className="w-full rounded-xl border border-border bg-background/60 py-2.5 pr-10 pl-3 text-sm outline-none focus:border-accent"
             />
           </div>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} className="rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm">
-            {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
+          <select
+            value={dept}
+            onChange={(e) => setDept(e.target.value)}
+            className="rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm"
+          >
+            {DEPARTMENTS.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm">
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm"
+          >
             <option value={0}>كل السنوات</option>
-            {YEARS.slice(1).map((y) => <option key={y} value={y}>السنة {y}</option>)}
+            {YEARS.slice(1).map((y) => (
+              <option key={y} value={y}>
+                السنة {y}
+              </option>
+            ))}
           </select>
           {isAdmin && (
             <button
@@ -127,7 +172,9 @@ function SubjectsPage() {
         </div>
 
         {isLoading ? (
-          <div className="mt-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>
+          <div className="mt-12 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-accent" />
+          </div>
         ) : filtered.length === 0 ? (
           <div className="mt-12 text-center text-muted-foreground">
             {(data?.length ?? 0) === 0 ? "لا توجد مواد بعد." : "مفيش مادة بتطابق الفلتر."}
@@ -148,7 +195,9 @@ function SubjectsPage() {
                     <div className="rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">
                       {s.code}
                     </div>
-                    <div className="text-xs text-muted-foreground">السنة {s.year} · ف{s.semester}</div>
+                    <div className="text-xs text-muted-foreground">
+                      السنة {s.year} · ف{s.semester}
+                    </div>
                   </div>
                   <div>
                     <h3 className="font-display text-lg leading-tight">{s.name_ar}</h3>
@@ -184,14 +233,20 @@ function SubjectsPage() {
       {showCreate && (
         <SubjectModal
           onClose={() => setShowCreate(false)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setShowCreate(false); }}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["subjects"] });
+            setShowCreate(false);
+          }}
         />
       )}
       {editingSubject && (
         <SubjectModal
           subject={editingSubject}
           onClose={() => setEditingSubject(null)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ["subjects"] }); setEditingSubject(null); }}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["subjects"] });
+            setEditingSubject(null);
+          }}
         />
       )}
       <Outlet />
@@ -199,7 +254,15 @@ function SubjectsPage() {
   );
 }
 
-function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClose: () => void; onSaved: () => void }) {
+function SubjectModal({
+  subject,
+  onClose,
+  onSaved,
+}: {
+  subject?: Subject;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const isEdit = !!subject;
   const [code, setCode] = useState(subject?.code ?? "");
   const [nameAr, setNameAr] = useState(subject?.name_ar ?? "");
@@ -209,6 +272,8 @@ function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClos
   const [semester, setSemester] = useState(subject?.semester ?? 1);
   const [creditHours, setCreditHours] = useState(subject?.credit_hours ?? 3);
   const [description, setDescription] = useState(subject?.description ?? "");
+  const [instructorName, setInstructorName] = useState(subject?.instructor_name ?? "");
+  const [prereqInput, setPrereqInput] = useState((subject?.prerequisite_codes ?? []).join(", "));
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -216,8 +281,20 @@ function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClos
     if (!code.trim() || !nameAr.trim()) return toast.error("الكود والاسم العربي مطلوبين");
     setSaving(true);
     const payload = {
-      code: code.trim(), name_ar: nameAr.trim(), name_en: nameEn.trim() || null,
-      department, year, semester, credit_hours: creditHours, description: description.trim() || null,
+      code: code.trim(),
+      name_ar: nameAr.trim(),
+      name_en: nameEn.trim() || null,
+      department,
+      year,
+      semester,
+      credit_hours: creditHours,
+      description: description.trim() || null,
+      instructor_name: instructorName.trim() || null,
+      prerequisite_codes: prereqInput
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean),
+      is_department_gated: department === "الكيمياء الصناعية",
     };
     const { error } = isEdit
       ? await supabase.from("subjects").update(payload).eq("id", subject!.id)
@@ -233,24 +310,91 @@ function SubjectModal({ subject, onClose, onSaved }: { subject?: Subject; onClos
       <div className="cosmic-card w-full max-w-lg rounded-2xl bg-card p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-xl">{isEdit ? "تعديل المادة" : "إضافة مادة جديدة"}</h2>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-secondary"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-secondary">
+            <X className="h-4 w-4" />
+          </button>
         </div>
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-          <input className="modal-input" placeholder="الكود (مثل MATH101)" value={code} onChange={(e) => setCode(e.target.value)} required />
-          <input className="modal-input" placeholder="الاسم بالعربي" value={nameAr} onChange={(e) => setNameAr(e.target.value)} required />
-          <input className="modal-input sm:col-span-2" placeholder="الاسم بالإنجليزي (اختياري)" value={nameEn ?? ""} onChange={(e) => setNameEn(e.target.value)} />
-          <select className="modal-input" value={department} onChange={(e) => setDepartment(e.target.value)}>
-            {DEPARTMENTS.slice(1).map((d) => <option key={d}>{d}</option>)}
+          <input
+            className="modal-input"
+            placeholder="الكود (مثل MATH101)"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+          />
+          <input
+            className="modal-input"
+            placeholder="الاسم بالعربي"
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
+            required
+          />
+          <input
+            className="modal-input sm:col-span-2"
+            placeholder="الاسم بالإنجليزي (اختياري)"
+            value={nameEn ?? ""}
+            onChange={(e) => setNameEn(e.target.value)}
+          />
+          <select
+            className="modal-input"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          >
+            {DEPARTMENTS.slice(1).map((d) => (
+              <option key={d}>{d}</option>
+            ))}
           </select>
-          <select className="modal-input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {[1, 2, 3, 4].map((y) => <option key={y} value={y}>السنة {y}</option>)}
+          <select
+            className="modal-input"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+          >
+            {[1, 2, 3, 4].map((y) => (
+              <option key={y} value={y}>
+                السنة {y}
+              </option>
+            ))}
           </select>
-          <select className="modal-input" value={semester} onChange={(e) => setSemester(Number(e.target.value))}>
-            <option value={1}>الفصل الأول</option><option value={2}>الفصل الثاني</option>
+          <select
+            className="modal-input"
+            value={semester}
+            onChange={(e) => setSemester(Number(e.target.value))}
+          >
+            <option value={1}>الفصل الأول</option>
+            <option value={2}>الفصل الثاني</option>
           </select>
-          <input type="number" min={0} max={6} className="modal-input" value={creditHours ?? 3} onChange={(e) => setCreditHours(Number(e.target.value))} />
-          <textarea className="modal-input sm:col-span-2" placeholder="وصف مختصر (اختياري)" rows={2} value={description ?? ""} onChange={(e) => setDescription(e.target.value)} />
-          <button type="submit" disabled={saving} className="sm:col-span-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+          <input
+            type="number"
+            min={0}
+            max={6}
+            className="modal-input"
+            value={creditHours ?? 3}
+            onChange={(e) => setCreditHours(Number(e.target.value))}
+          />
+          <input
+            className="modal-input"
+            placeholder="اسم الدكتور (اختياري)"
+            value={instructorName}
+            onChange={(e) => setInstructorName(e.target.value)}
+          />
+          <input
+            className="modal-input sm:col-span-2"
+            placeholder="متطلبات سابقة، اكواد مفصولة بفاصلة (مثال: CHEM101, CHEM102)"
+            value={prereqInput}
+            onChange={(e) => setPrereqInput(e.target.value)}
+          />
+          <textarea
+            className="modal-input sm:col-span-2"
+            placeholder="وصف مختصر (اختياري)"
+            rows={2}
+            value={description ?? ""}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={saving}
+            className="sm:col-span-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          >
             {saving ? "جاري الحفظ..." : isEdit ? "حفظ التعديل" : "حفظ"}
           </button>
         </form>
