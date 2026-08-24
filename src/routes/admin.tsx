@@ -1,7 +1,18 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, Eye, ArrowLeft, UserPlus, Trash2, ClipboardList } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  Eye,
+  ArrowLeft,
+  UserPlus,
+  Trash2,
+  ClipboardList,
+  Pencil,
+} from "lucide-react";
 import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
@@ -47,7 +58,10 @@ function AdminPage() {
 
       <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4 rotate-180" /> الرجوع
           </Link>
           <div className="flex items-center gap-3">
@@ -88,7 +102,15 @@ function AdminPage() {
   );
 }
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -121,12 +143,22 @@ function VerificationTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function showCard(row: ProfileRow) {
-    if (!row.id_card_url) { toast.error("لا توجد صورة"); return; }
-    const { data, error } = await supabase.storage.from("id-cards").createSignedUrl(row.id_card_url, 600);
-    if (error || !data) { toast.error("تعذر فتح الصورة"); return; }
+    if (!row.id_card_url) {
+      toast.error("لا توجد صورة");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("id-cards")
+      .createSignedUrl(row.id_card_url, 600);
+    if (error || !data) {
+      toast.error("تعذر فتح الصورة");
+      return;
+    }
     setPreview({ row, url: data.signedUrl });
   }
 
@@ -148,7 +180,11 @@ function VerificationTab() {
     const reason = prompt("سبب الرفض (اختياري):") ?? "";
     const { error } = await supabase
       .from("profiles")
-      .update({ verification_status: "rejected", is_verified: false, rejection_reason: reason || "بيانات غير صحيحة" })
+      .update({
+        verification_status: "rejected",
+        is_verified: false,
+        rejection_reason: reason || "بيانات غير صحيحة",
+      })
       .eq("id", row.id);
     if (error) return toast.error("فشل الرفض");
     toast.success("تم رفض الطلب");
@@ -158,7 +194,11 @@ function VerificationTab() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </div>
+    );
   }
 
   if (pending.length === 0) {
@@ -196,13 +236,25 @@ function VerificationTab() {
                   <td className="px-4 py-3 text-xs">{row.batch_year}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1.5">
-                      <button onClick={() => showCard(row)} className="rounded-lg border border-border p-1.5 hover:border-accent" title="عرض البطاقة">
+                      <button
+                        onClick={() => showCard(row)}
+                        className="rounded-lg border border-border p-1.5 hover:border-accent"
+                        title="عرض البطاقة"
+                      >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => approve(row)} className="rounded-lg bg-green-600/15 p-1.5 text-green-700 hover:bg-green-600/25" title="تأكيد">
+                      <button
+                        onClick={() => approve(row)}
+                        className="rounded-lg bg-green-600/15 p-1.5 text-green-700 hover:bg-green-600/25"
+                        title="تأكيد"
+                      >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => reject(row)} className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25" title="رفض">
+                      <button
+                        onClick={() => reject(row)}
+                        className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25"
+                        title="رفض"
+                      >
                         <XCircle className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -215,21 +267,42 @@ function VerificationTab() {
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
-          <div className="cosmic-card max-w-2xl rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="cosmic-card max-w-2xl rounded-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <div className="font-display text-lg">{preview.row.full_name}</div>
                 <div className="text-xs text-foreground/75">{preview.row.academic_id}</div>
               </div>
-              <button onClick={() => setPreview(null)} className="text-foreground/75 hover:text-foreground">✕</button>
+              <button
+                onClick={() => setPreview(null)}
+                className="text-foreground/75 hover:text-foreground"
+              >
+                ✕
+              </button>
             </div>
-            <img src={preview.url} alt="بطاقة جامعية" className="max-h-[60vh] w-full rounded-lg object-contain" />
+            <img
+              src={preview.url}
+              alt="بطاقة جامعية"
+              className="max-h-[60vh] w-full rounded-lg object-contain"
+            />
             <div className="mt-4 flex gap-2">
-              <button onClick={() => approve(preview.row)} className="flex-1 rounded-full bg-green-600 py-2.5 text-sm font-semibold text-white">
+              <button
+                onClick={() => approve(preview.row)}
+                className="flex-1 rounded-full bg-green-600 py-2.5 text-sm font-semibold text-white"
+              >
                 تأكيد ✓
               </button>
-              <button onClick={() => reject(preview.row)} className="flex-1 rounded-full bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground">
+              <button
+                onClick={() => reject(preview.row)}
+                className="flex-1 rounded-full bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
+              >
                 رفض ✗
               </button>
             </div>
@@ -269,24 +342,33 @@ function AdminsTab() {
     const admins: AdminRow[] = [];
     (roleRows ?? []).forEach((r) => {
       if (r.role === "admin" || r.role === "super_admin") {
-        admins.push({ user_id: r.user_id, role: r.role as "admin" | "super_admin", profile: profMap.get(r.user_id) ?? null });
+        admins.push({
+          user_id: r.user_id,
+          role: r.role as "admin" | "super_admin",
+          profile: profMap.get(r.user_id) ?? null,
+        });
       }
     });
-    const users: UserRow[] = (profs ?? []).map((p) => ({ ...(p as ProfileRow), roles: rolesByUser.get(p.id) ?? [] }));
+    const users: UserRow[] = (profs ?? []).map((p) => ({
+      ...(p as ProfileRow),
+      roles: rolesByUser.get(p.id) ?? [],
+    }));
     setRows(admins);
     setAllUsers(users);
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  async function promoteById(userId: string) {
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
+  async function promoteById(userId: string, role: AppRole = "admin") {
+    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
     if (error) {
-      if (error.code === "23505") toast.info("ده أدمن أصلاً");
+      if (error.code === "23505") toast.info("عنده الدور ده أصلاً");
       else toast.error("فشل التعيين");
     } else {
-      toast.success("تم التعيين كأدمن ✨");
+      toast.success("تم التعيين ✨");
       load();
     }
   }
@@ -296,7 +378,11 @@ function AdminsTab() {
     if (!emailInput.trim()) return;
     setSubmitting(true);
     const email = emailInput.trim().toLowerCase();
-    const { data: prof } = await supabase.from("profiles").select("id").eq("email", email).maybeSingle();
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
     if (!prof) {
       toast.error("لا يوجد مستخدم بهذا الإيميل — لازم يسجل دخول الأول");
       setSubmitting(false);
@@ -307,16 +393,22 @@ function AdminsTab() {
     setSubmitting(false);
   }
 
-  async function revoke(row: AdminRow) {
-    if (row.role === "super_admin") { toast.error("لا يمكن إزالة الـ Super Admin"); return; }
-    if (!confirm(`إزالة صلاحية الأدمن من ${row.profile?.full_name || row.profile?.email}؟`)) return;
+  async function revoke(userId: string, role: AppRole, label: string) {
+    if (role === "super_admin") {
+      toast.error("لا يمكن إزالة الـ Super Admin");
+      return;
+    }
+    if (!confirm(`إزالة صلاحية "${label}"؟`)) return;
     const { error } = await supabase
       .from("user_roles")
       .delete()
-      .eq("user_id", row.user_id)
-      .eq("role", "admin");
+      .eq("user_id", userId)
+      .eq("role", role);
     if (error) toast.error("فشل الإزالة");
-    else { toast.success("تمت الإزالة"); load(); }
+    else {
+      toast.success("تمت الإزالة");
+      load();
+    }
   }
 
   const filtered = allUsers.filter((u) => {
@@ -355,7 +447,9 @@ function AdminsTab() {
 
       <div className="cosmic-card overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-2 border-b border-border bg-secondary/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs uppercase tracking-wider text-foreground/75">كل المستخدمين ({allUsers.length})</div>
+          <div className="text-xs uppercase tracking-wider text-foreground/75">
+            كل المستخدمين ({allUsers.length})
+          </div>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -364,16 +458,27 @@ function AdminsTab() {
           />
         </div>
         {loading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-accent" /></div>
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-accent" />
+          </div>
         ) : (
           <ul className="divide-y divide-border/60">
             {filtered.map((u) => {
-              const isSuper = u.roles.includes("super_admin") || u.email?.trim().toLowerCase() === OWNER_EMAIL;
+              const isSuper =
+                u.roles.includes("super_admin") || u.email?.trim().toLowerCase() === OWNER_EMAIL;
               const isAdm = u.roles.includes("admin");
+              const isAdvisor = u.roles.includes("department_advisor");
+              const isInstructor = u.roles.includes("instructor");
               return (
-                <li key={u.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <li
+                  key={u.id}
+                  className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{u.full_name ?? "—"}</div>
+                    <div className="truncate font-medium">
+                      {u.display_title ? `${u.display_title} ` : ""}
+                      {u.full_name ?? "—"}
+                    </div>
                     <div className="truncate text-xs text-foreground/75">{u.email}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -381,13 +486,41 @@ function AdminsTab() {
                       {u.verification_status}
                     </span>
                     {isSuper && (
-                      <span className="rounded-full bg-gradient-cosmic px-3 py-0.5 text-xs text-primary-foreground">Super Admin</span>
+                      <span className="rounded-full bg-gradient-cosmic px-3 py-0.5 text-xs text-primary-foreground">
+                        Super Admin
+                      </span>
                     )}
                     {isAdm && !isSuper && (
                       <>
                         <span className="rounded-full bg-secondary px-3 py-0.5 text-xs">Admin</span>
                         <button
-                          onClick={() => revoke({ user_id: u.id, role: "admin", profile: u })}
+                          onClick={() => revoke(u.id, "admin", "أدمن")}
+                          className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25"
+                          title="إزالة"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                    {isAdvisor && (
+                      <>
+                        <span className="rounded-full bg-secondary px-3 py-0.5 text-xs">
+                          مشرف أكاديمي
+                        </span>
+                        <button
+                          onClick={() => revoke(u.id, "department_advisor", "مشرف أكاديمي")}
+                          className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25"
+                          title="إزالة"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                    {isInstructor && (
+                      <>
+                        <span className="rounded-full bg-secondary px-3 py-0.5 text-xs">دكتور</span>
+                        <button
+                          onClick={() => revoke(u.id, "instructor", "دكتور")}
                           className="rounded-lg bg-destructive/15 p-1.5 text-destructive hover:bg-destructive/25"
                           title="إزالة"
                         >
@@ -397,18 +530,57 @@ function AdminsTab() {
                     )}
                     {!isSuper && !isAdm && (
                       <button
-                        onClick={() => promoteById(u.id)}
+                        onClick={() => promoteById(u.id, "admin")}
                         className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
                       >
-                        <UserPlus className="h-3.5 w-3.5" /> تعيين أدمن
+                        <UserPlus className="h-3.5 w-3.5" /> أدمن
                       </button>
                     )}
+                    {!isSuper && !isAdvisor && (
+                      <button
+                        onClick={() => promoteById(u.id, "department_advisor")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold hover:border-accent"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> مشرف أكاديمي
+                      </button>
+                    )}
+                    {!isSuper && !isInstructor && (
+                      <button
+                        onClick={() => promoteById(u.id, "instructor")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold hover:border-accent"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> دكتور
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const title = prompt(
+                          "لقب العرض (مثلاً: د. أحمد) — سيبه فاضي عشان تمسحه:",
+                          u.display_title ?? "",
+                        );
+                        if (title === null) return;
+                        const { error } = await supabase
+                          .from("profiles")
+                          .update({ display_title: title.trim() || null })
+                          .eq("id", u.id);
+                        if (error) toast.error(error.message);
+                        else {
+                          toast.success("اتحفظ اللقب");
+                          load();
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold hover:border-accent"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> لقب
+                    </button>
                   </div>
                 </li>
               );
             })}
             {filtered.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-foreground/75">لا يوجد مستخدمين مطابقين</li>
+              <li className="px-4 py-8 text-center text-sm text-foreground/75">
+                لا يوجد مستخدمين مطابقين
+              </li>
             )}
           </ul>
         )}
@@ -437,7 +609,14 @@ function ApplicationsTab() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("الكل");
 
-  const committees = ["الكل", "PR Committee", "Media Committee", "HR Committee", "OC Committee", "AC Committee"];
+  const committees = [
+    "الكل",
+    "PR Committee",
+    "Media Committee",
+    "HR Committee",
+    "OC Committee",
+    "AC Committee",
+  ];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -450,15 +629,14 @@ function ApplicationsTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const filtered = filter === "الكل" ? apps : apps.filter((a) => a.committee === filter);
 
   const handleStatus = async (id: string, status: string) => {
-    const { error } = await supabase
-      .from("committee_applications")
-      .update({ status })
-      .eq("id", id);
+    const { error } = await supabase.from("committee_applications").update({ status }).eq("id", id);
     if (error) toast.error("حصل خطأ");
     else {
       toast.success(status === "accepted" ? "تم القبول ✅" : "تم الرفض");
@@ -466,11 +644,12 @@ function ApplicationsTab() {
     }
   };
 
-  if (loading) return (
-    <div className="flex justify-center py-20">
-      <Loader2 className="h-8 w-8 animate-spin text-accent" />
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
 
   return (
     <div>
@@ -512,20 +691,40 @@ function ApplicationsTab() {
                   <div className="font-semibold text-base">{app.full_name}</div>
                   <div className="text-xs text-accent font-medium mt-0.5">{app.committee}</div>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${
-                  app.status === "accepted" ? "bg-green-500/20 text-green-400" :
-                  app.status === "rejected" ? "bg-red-500/20 text-red-400" :
-                  "bg-foreground/10 text-foreground/60"
-                }`}>
-                  {app.status === "accepted" ? "مقبول ✅" : app.status === "rejected" ? "مرفوض ❌" : "قيد المراجعة"}
+                <span
+                  className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${
+                    app.status === "accepted"
+                      ? "bg-green-500/20 text-green-400"
+                      : app.status === "rejected"
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-foreground/10 text-foreground/60"
+                  }`}
+                >
+                  {app.status === "accepted"
+                    ? "مقبول ✅"
+                    : app.status === "rejected"
+                      ? "مرفوض ❌"
+                      : "قيد المراجعة"}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-foreground/70">
-                <div><span className="text-foreground/40">الرقم الأكاديمي: </span>{app.email}</div>
-                <div><span className="text-foreground/40">الواتساب: </span>{app.phone}</div>
-                <div><span className="text-foreground/40">السنة: </span>{app.academic_year}</div>
-                <div><span className="text-foreground/40">التاريخ: </span>{new Date(app.created_at).toLocaleDateString("ar-EG")}</div>
+                <div>
+                  <span className="text-foreground/40">الرقم الأكاديمي: </span>
+                  {app.email}
+                </div>
+                <div>
+                  <span className="text-foreground/40">الواتساب: </span>
+                  {app.phone}
+                </div>
+                <div>
+                  <span className="text-foreground/40">السنة: </span>
+                  {app.academic_year}
+                </div>
+                <div>
+                  <span className="text-foreground/40">التاريخ: </span>
+                  {new Date(app.created_at).toLocaleDateString("ar-EG")}
+                </div>
               </div>
 
               <div className="text-xs bg-background/40 rounded-xl p-3">
