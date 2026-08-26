@@ -96,6 +96,13 @@ function SubjectsPage() {
     });
   }, [data, dept, year, q]);
 
+  // Merge the default category list with any custom categories admins have already
+  // typed in, so new names show up as filter/select options everywhere too.
+  const departmentOptions = useMemo(() => {
+    const fromData = (data ?? []).map((s) => s.department).filter(Boolean);
+    return Array.from(new Set([...DEPARTMENTS.slice(1), ...fromData]));
+  }, [data]);
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -145,7 +152,8 @@ function SubjectsPage() {
             onChange={(e) => setDept(e.target.value)}
             className="rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm"
           >
-            {DEPARTMENTS.map((d) => (
+            <option>الكل</option>
+            {departmentOptions.map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
@@ -232,6 +240,7 @@ function SubjectsPage() {
 
       {showCreate && (
         <SubjectModal
+          departmentOptions={departmentOptions}
           onClose={() => setShowCreate(false)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["subjects"] });
@@ -242,6 +251,7 @@ function SubjectsPage() {
       {editingSubject && (
         <SubjectModal
           subject={editingSubject}
+          departmentOptions={departmentOptions}
           onClose={() => setEditingSubject(null)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["subjects"] });
@@ -256,10 +266,12 @@ function SubjectsPage() {
 
 function SubjectModal({
   subject,
+  departmentOptions,
   onClose,
   onSaved,
 }: {
   subject?: Subject;
+  departmentOptions: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -335,15 +347,19 @@ function SubjectModal({
             value={nameEn ?? ""}
             onChange={(e) => setNameEn(e.target.value)}
           />
-          <select
+          <input
             className="modal-input"
+            list="department-options"
+            placeholder="التصنيف (اختر من القائمة أو اكتب تصنيف جديد)"
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-          >
-            {DEPARTMENTS.slice(1).map((d) => (
-              <option key={d}>{d}</option>
+            required
+          />
+          <datalist id="department-options">
+            {departmentOptions.map((d) => (
+              <option key={d} value={d} />
             ))}
-          </select>
+          </datalist>
           <select
             className="modal-input"
             value={year}
