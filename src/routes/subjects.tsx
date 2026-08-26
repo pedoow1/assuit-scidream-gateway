@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link, Outlet } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -45,6 +45,11 @@ function SubjectsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isAdmin = isAdminRole(roles);
+  const location = useLocation();
+  // When a specific subject is open (e.g. /subjects/:subjectId[...]) we hide the
+  // list/filters here and just render the child route full-screen, so opening a
+  // subject doesn't require scrolling past the whole list to see its content.
+  const isSubjectOpen = location.pathname !== "/subjects" && location.pathname !== "/subjects/";
 
   const [dept, setDept] = useState("الكل");
   const [year, setYear] = useState<number>(0);
@@ -109,6 +114,12 @@ function SubjectsPage() {
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
       </div>
     );
+  }
+
+  // A subject (or its nested quiz pages) is open: show only that page,
+  // full-screen, instead of stacking it below the subjects list.
+  if (isSubjectOpen) {
+    return <Outlet />;
   }
 
   return (
@@ -259,7 +270,6 @@ function SubjectsPage() {
           }}
         />
       )}
-      <Outlet />
     </div>
   );
 }
