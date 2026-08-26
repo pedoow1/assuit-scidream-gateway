@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Loader2, ArrowLeft, FolderPlus, Folder, FileText, Youtube, Link as LinkIcon,
-  Plus, ChevronLeft, X, Trash2, Upload, Download, HardDriveDownload, Pencil,
+  Plus, ChevronLeft, ChevronDown, X, Trash2, Upload, Download, HardDriveDownload, Pencil,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
@@ -41,6 +41,7 @@ function SubjectDetailPage() {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [showAddContent, setShowAddContent] = useState(false);
   const [showImportDrive, setShowImportDrive] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -128,46 +129,63 @@ function SubjectDetailPage() {
     <div className="relative min-h-screen">
       <StarsBackground />
 
-      <header className="relative z-10 border-b border-border/60 bg-background/60 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/subjects" className="flex items-center gap-2 text-sm text-foreground/75 hover:text-foreground">
+          <Link to="/subjects" className="flex items-center gap-2 text-sm font-medium text-foreground/75 hover:text-foreground">
             <ArrowLeft className="h-4 w-4 rotate-180" /> كل المواد
           </Link>
+          {subject && (
+            <div className="hidden truncate text-sm font-medium text-foreground/75 sm:block">
+              {subject.name_ar}
+            </div>
+          )}
           <Logo size={36} />
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+      <main className="relative z-10 mx-auto max-w-7xl px-6 py-6">
         {!subject ? (
           <div className="cosmic-card rounded-2xl p-8 text-center text-foreground/75">المادة مش موجودة.</div>
         ) : (
           <>
-            <div className="cosmic-card rounded-3xl p-6 md:p-8">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="inline-block rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">{subject.code}</div>
-                  <h1 className="mt-3 font-display text-3xl">{subject.name_ar}</h1>
-                  {subject.name_en && <div className="mt-1 text-sm text-foreground/75">{subject.name_en}</div>}
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <div className="cosmic-card rounded-2xl p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="shrink-0 rounded-lg bg-gradient-cosmic px-2.5 py-1 text-[10px] font-semibold text-primary-foreground">{subject.code}</div>
+                  <h1 className="truncate font-display text-lg md:text-xl">{subject.name_ar}</h1>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => setShowDetails((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-3.5 py-1.5 text-xs font-medium hover:border-accent"
+                  >
+                    تفاصيل المادة <ChevronDown className={`h-3.5 w-3.5 transition ${showDetails ? "rotate-180" : ""}`} />
+                  </button>
+                  <Link
+                    to="/subjects/$subjectId/quizzes"
+                    params={{ subjectId: subject.id }}
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-cosmic px-4 py-1.5 text-xs font-semibold text-primary-foreground shadow-rose transition hover:shadow-glow"
+                  >
+                    اختبارات المادة ✨
+                  </Link>
+                </div>
+              </div>
+              {showDetails && (
+                <div className="mt-4 border-t border-border/50 pt-4">
+                  {subject.name_en && <div className="text-sm text-foreground/75">{subject.name_en}</div>}
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-secondary px-3 py-1">{subject.department}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">السنة {subject.year}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">الفصل {subject.semester}</span>
                     <span className="rounded-full bg-secondary px-3 py-1">{subject.credit_hours ?? 3} ساعة</span>
                   </div>
-                  {subject.description && <p className="mt-4 text-sm leading-relaxed text-foreground/75">{subject.description}</p>}
+                  {subject.description && <p className="mt-3 text-sm leading-relaxed text-foreground/75">{subject.description}</p>}
                 </div>
-                <Link
-                  to="/subjects/$subjectId/quizzes"
-                  params={{ subjectId: subject.id }}
-                  className="inline-flex items-center gap-2 self-start rounded-full bg-gradient-cosmic px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-rose transition hover:shadow-glow"
-                >
-                  اختبارات المادة ✨
-                </Link>
-              </div>
+              )}
             </div>
 
             {/* Breadcrumb */}
-            <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
               <button onClick={() => setCurrentFolderId(null)} className={`rounded-full px-3 py-1 ${currentFolderId === null ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
                 الجذر
               </button>
