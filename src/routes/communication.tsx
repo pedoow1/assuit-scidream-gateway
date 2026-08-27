@@ -90,6 +90,60 @@ const DAYS: { key: string; label: string }[] = [
   { key: "fri", label: "الجمعة" },
 ];
 
+function formatBytes(bytes?: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} بايت`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} كيلوبايت`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} ميجا`;
+}
+
+function fileNameFromUrl(url: string) {
+  try {
+    const clean = url.split("?")[0];
+    const last = clean.split("/").pop() ?? "ملف";
+    return decodeURIComponent(last.replace(/^\d+-/, ""));
+  } catch {
+    return "ملف";
+  }
+}
+
+// Discord-style attachment card: icon + name + size + download, no giant
+// mismatched thumbnails crammed into the bubble.
+function FileCard({
+  name,
+  url,
+  size,
+  tint = "self",
+}: {
+  name: string;
+  url: string;
+  size?: number | null;
+  tint?: "self" | "other";
+}) {
+  const ext = (name.split(".").pop() || "").toUpperCase().slice(0, 4);
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      download
+      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition hover:brightness-110 ${
+        tint === "self"
+          ? "border-primary-foreground/20 bg-primary-foreground/10"
+          : "border-border/60 bg-background/50"
+      }`}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-[10px] font-bold text-accent">
+        {ext || "FILE"}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{name}</span>
+        {!!size && <span className="block text-[11px] opacity-70">{formatBytes(size)}</span>}
+      </span>
+    </a>
+  );
+}
+
 function CommunicationPage() {
   const { user, loading, roles } = useAuth();
   const navigate = useNavigate();
@@ -497,7 +551,7 @@ function ChatView({
         ? "video"
         : file.type.startsWith("audio")
           ? "audio"
-          : "image";
+          : "file"; // PDFs, Word, PowerPoint, zip... — shown as a clean file card, not a broken thumbnail
 
     // optimistic placeholder
     const tempId = `temp-${Date.now()}`;
@@ -509,7 +563,7 @@ function ChatView({
         sender_id: userId,
         channel,
         type,
-        content: "بيترفع...",
+        content: type === "file" ? file.name : "بيترفع...",
         media_url: null,
         is_deleted: false,
         created_at: new Date().toISOString(),
@@ -535,6 +589,7 @@ function ChatView({
       sender_id: userId,
       channel,
       type,
+      content: type === "file" ? file.name : null,
       media_url: publicUrl,
       media_size_bytes: file.size,
     });
@@ -560,22 +615,35 @@ function ChatView({
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`group relative max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+            className={`group relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
               m.sender_id === userId
-                ? "mr-auto bg-gradient-cosmic text-primary-foreground"
-                : "ml-auto bg-card/70"
+                ? "mr-auto bg-accent/90 text-accent-foreground"
+                : "ml-auto bg-card/80 border border-border/50"
             }`}
           >
-            {m.type === "text" && <p>{m.content}</p>}
+            {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
             {m.type === "image" && m.media_url && (
-              <img src={m.media_url} className="max-h-64 rounded-xl" />
+              <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
             )}
             {m.type === "video" && m.media_url && (
               <video src={m.media_url} controls className="max-h-64 rounded-xl" />
             )}
-            {m.type === "audio" && m.media_url && <audio src={m.media_url} controls />}
-            {(m.type === "image" || m.type === "video" || m.type === "audio") &&
-              !m.media_url && <p className="text-xs opacity-70">{m.content}</p>}
+            {m.type === "audio" && m.media_url && (
+              <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
+            )}
+            {m.type === "file" && m.media_url && (
+              <FileCard
+                name={m.content || fileNameFromUrl(m.media_url)}
+                url={m.media_url}
+                size={(m as any).media_size_bytes}
+                tint={m.sender_id === userId ? "self" : "other"}
+              />
+            )}
+            {m.type !== "text" && !m.media_url && (
+              <p className="flex items-center gap-1.5 text-xs opacity-70">
+                <Loader2 className="h-3 w-3 animate-spin" /> {m.content}
+              </p>
+            )}
 
             {isAdmin && !m.id.startsWith("temp-") && (
               <div className="absolute -top-3 right-1 hidden gap-1 group-hover:flex">
@@ -613,7 +681,7 @@ function ChatView({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/*,audio/*"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -1150,7 +1218,7 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         ? "video"
         : file.type.startsWith("audio")
           ? "audio"
-          : "image";
+          : "file";
     setUploading(true);
     const path = `${conversationId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await db.storage.from("dm-media").upload(path, file);
@@ -1162,6 +1230,7 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
       conversation_id: conversationId,
       sender_id: userId,
       type,
+      content: type === "file" ? file.name : null,
       media_url: signed?.signedUrl ?? null,
       media_size_bytes: file.size,
     });
@@ -1174,16 +1243,24 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
               m.sender_id === userId
-                ? "mr-auto bg-gradient-cosmic text-primary-foreground"
-                : "ml-auto bg-card/70"
+                ? "mr-auto bg-accent/90 text-accent-foreground"
+                : "ml-auto bg-card/80 border border-border/50"
             }`}
           >
-            {m.type === "text" && <p>{m.content}</p>}
-            {m.type === "image" && m.media_url && <img src={m.media_url} className="max-h-64 rounded-xl" />}
+            {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+            {m.type === "image" && m.media_url && <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />}
             {m.type === "video" && m.media_url && <video src={m.media_url} controls className="max-h-64 rounded-xl" />}
-            {m.type === "audio" && m.media_url && <audio src={m.media_url} controls />}
+            {m.type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />}
+            {m.type === "file" && m.media_url && (
+              <FileCard
+                name={m.content || fileNameFromUrl(m.media_url)}
+                url={m.media_url}
+                size={m.media_size_bytes}
+                tint={m.sender_id === userId ? "self" : "other"}
+              />
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -1192,7 +1269,7 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*,audio/*"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
