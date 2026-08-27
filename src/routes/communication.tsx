@@ -25,6 +25,8 @@ import {
   MoreVertical,
   FolderTree,
   Hash,
+  X,
+  Trash,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -163,6 +165,57 @@ function formatTime(iso: string) {
   }
 }
 
+// How long after sending a normal member can still "delete for everyone".
+const DELETE_FOR_EVERYONE_WINDOW_MS = 20 * 60 * 1000;
+
+function typingLabel(names: string[]) {
+  if (names.length === 0) return "";
+  if (names.length === 1) return `${names[0]} بيكتب...`;
+  if (names.length === 2) return `${names[0]} و ${names[1]} بيكتبوا...`;
+  return `${names[0]} و ${names[1]} و آخرون بيكتبوا...`;
+}
+
+function blobToFile(blob: Blob, ext = "webm") {
+  return new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type || "audio/webm" });
+}
+
+function formatRecordTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// Fullscreen image viewer — tap any chat image to open it like WhatsApp/Discord.
+function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        title="قفل"
+        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <img
+        src={url}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-full max-w-full rounded-lg object-contain"
+      />
+    </div>
+  );
+}
+
 // Shared composer bar used by both group chat and DMs — one pill-shaped
 // input instead of separate boxy controls.
 function Composer({
@@ -170,19 +223,76 @@ function Composer({
   onTextChange,
   onSend,
   onPickFile,
+  onSendVoice,
   uploading,
   disabled,
   disabledMessage,
+  typingNames,
 }: {
   text: string;
   onTextChange: (v: string) => void;
   onSend: () => void;
   onPickFile: (file: File) => void;
+  onSendVoice?: (blob: Blob) => void;
   uploading: boolean;
   disabled?: boolean;
   disabledMessage?: string;
+  typingNames?: string[];
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelledRef = useRef(false);
+
+  function stopStream() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
+
+  async function startRecording() {
+    if (!onSendVoice) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      cancelledRef.current = false;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stopStream();
+        if (!cancelledRef.current && chunksRef.current.length > 0) {
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+          onSendVoice(blob);
+        }
+        chunksRef.current = [];
+      };
+      recorder.start();
+      setRecording(true);
+      setRecordSeconds(0);
+      timerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+    } catch {
+      toast.error("محتاج إذن الميكروفون علشان تسجل رسالة صوتية");
+    }
+  }
+
+  function stopRecording(cancel: boolean) {
+    cancelledRef.current = cancel;
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setRecording(false);
+  }
+
+  useEffect(() => () => stopStream(), []);
+
   if (disabled) {
     return (
       <p className="mt-3 rounded-full border border-border/60 bg-card/40 px-4 py-2.5 text-center text-xs text-foreground/60">
@@ -190,41 +300,81 @@ function Composer({
       </p>
     );
   }
+
+  const hasText = text.trim().length > 0;
+
   return (
-    <div className="mt-3 flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 py-1 pl-1.5 pr-3 backdrop-blur">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPickFile(f);
-          e.target.value = "";
-        }}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        title="إرفاق صورة/فيديو/صوت/ملف"
-        className="shrink-0 rounded-full p-2 text-foreground/60 transition hover:bg-background/60 hover:text-foreground disabled:opacity-50"
-      >
-        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-      </button>
-      <input
-        value={text}
-        onChange={(e) => onTextChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onSend()}
-        placeholder="اكتب رسالة..."
-        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/40"
-      />
-      <button
-        onClick={onSend}
-        disabled={!text.trim()}
-        className="flex shrink-0 items-center justify-center rounded-full bg-gradient-cosmic p-2.5 text-primary-foreground transition disabled:opacity-40"
-      >
-        <Send className="h-4 w-4" />
-      </button>
+    <div className="mt-3">
+      {typingNames && typingNames.length > 0 && (
+        <p className="mb-1 truncate px-2 text-[11px] text-foreground/50">{typingLabel(typingNames)}</p>
+      )}
+      {recording ? (
+        <div className="flex items-center gap-2 rounded-full border border-border/60 bg-card/50 py-1.5 pl-1.5 pr-3 backdrop-blur">
+          <button
+            onClick={() => stopRecording(true)}
+            title="إلغاء"
+            className="shrink-0 rounded-full p-2 text-destructive transition hover:bg-destructive/10"
+          >
+            <Trash className="h-4 w-4" />
+          </button>
+          <span className="flex flex-1 items-center gap-2 text-sm text-foreground/70">
+            <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-destructive" />
+            {formatRecordTime(recordSeconds)}
+          </span>
+          <button
+            onClick={() => stopRecording(false)}
+            title="إرسال"
+            className="flex shrink-0 items-center justify-center rounded-full bg-gradient-cosmic p-2.5 text-primary-foreground transition"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 py-1 pl-1.5 pr-3 backdrop-blur">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPickFile(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            title="إرفاق صورة/فيديو/صوت/ملف"
+            className="shrink-0 rounded-full p-2 text-foreground/60 transition hover:bg-background/60 hover:text-foreground disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+          </button>
+          <input
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSend()}
+            placeholder="اكتب رسالة..."
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/40"
+          />
+          {hasText ? (
+            <button
+              onClick={onSend}
+              className="flex shrink-0 items-center justify-center rounded-full bg-gradient-cosmic p-2.5 text-primary-foreground transition"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          ) : onSendVoice ? (
+            <button
+              onClick={startRecording}
+              title="تسجيل رسالة صوتية"
+              className="flex shrink-0 items-center justify-center rounded-full bg-gradient-cosmic p-2.5 text-primary-foreground transition"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -267,10 +417,11 @@ function FileCard({
 }
 
 function CommunicationPage() {
-  const { user, loading, roles } = useAuth();
+  const { user, loading, roles, profile } = useAuth();
   const navigate = useNavigate();
   const isBigBoss = !!roles?.includes("super_admin");
   const canCreateGroups = isBigBoss || !!roles?.includes("admin");
+  const myName = profile?.full_name || user?.email || "أنا";
 
   const [mode, setMode] = useState<"groups" | "dm">("groups");
 
@@ -494,6 +645,7 @@ function CommunicationPage() {
               groups={groups}
               myLevel={myLevel}
               userId={user.id}
+              myName={myName}
               isBigBoss={isBigBoss}
               canCreateGroups={canCreateGroups}
               onSelectGroup={setActiveGroup}
@@ -710,6 +862,7 @@ function GroupPanel({
   groups,
   myLevel,
   userId,
+  myName,
   isBigBoss: isGlobalBigBoss,
   canCreateGroups,
   onSelectGroup,
@@ -720,6 +873,7 @@ function GroupPanel({
   groups: GroupRow[];
   myLevel: number;
   userId: string;
+  myName: string;
   isBigBoss: boolean;
   canCreateGroups: boolean;
   onSelectGroup: (g: GroupRow) => void;
@@ -826,13 +980,14 @@ function GroupPanel({
         </TabsList>
 
         <TabsContent value="chat">
-          <ChatView group={group} channel="general" userId={userId} isAdmin={isAdmin} muted={false} />
+          <ChatView group={group} channel="general" userId={userId} myName={myName} isAdmin={isAdmin} muted={false} />
         </TabsContent>
         <TabsContent value="announcements">
           <ChatView
             group={group}
             channel="announcements"
             userId={userId}
+            myName={myName}
             isAdmin={isAdmin}
             muted={false}
             readOnly={!isAdmin}
@@ -863,10 +1018,72 @@ function GroupPanel({
 // ============================================================
 // Chat (general + announcements share this component)
 // ============================================================
+// Per-message "..." menu: delete for me / delete for everyone (own message,
+// within the time window) / admin pin / admin add-to-announcements.
+function MessageActions({
+  message,
+  isSelf,
+  isAdmin,
+  channel,
+  onDeleteForMe,
+  onDeleteForEveryone,
+  onPin,
+  onAddToAnnouncements,
+}: {
+  message: MessageRow;
+  isSelf: boolean;
+  isAdmin: boolean;
+  channel: "general" | "announcements";
+  onDeleteForMe: (id: string) => void;
+  onDeleteForEveryone: (id: string) => void;
+  onPin: (id: string) => void;
+  onAddToAnnouncements: (m: MessageRow) => void;
+}) {
+  const withinWindow = Date.now() - new Date(message.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
+  const canDeleteForEveryone = isAdmin || (isSelf && withinWindow);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          title="خيارات الرسالة"
+          className="shrink-0 self-center rounded-full p-1 text-foreground/35 transition hover:bg-card/60 hover:text-foreground"
+        >
+          <MoreVertical className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" dir="rtl">
+        <DropdownMenuItem onClick={() => onDeleteForMe(message.id)}>
+          <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف عندي
+        </DropdownMenuItem>
+        {canDeleteForEveryone && (
+          <DropdownMenuItem
+            onClick={() => onDeleteForEveryone(message.id)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف عند الجميع
+          </DropdownMenuItem>
+        )}
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => onPin(message.id)}>
+            <Pin className="ml-2 h-3.5 w-3.5" /> تثبيت الرسالة
+          </DropdownMenuItem>
+        )}
+        {isAdmin && channel === "general" && (
+          <DropdownMenuItem onClick={() => onAddToAnnouncements(message)}>
+            <Megaphone className="ml-2 h-3.5 w-3.5" /> إضافة للإعلانات
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function ChatView({
   group,
   channel,
   userId,
+  myName,
   isAdmin,
   muted,
   readOnly = false,
@@ -874,6 +1091,7 @@ function ChatView({
   group: GroupRow;
   channel: "general" | "announcements";
   userId: string;
+  myName: string;
   isAdmin: boolean;
   muted: boolean;
   readOnly?: boolean;
@@ -881,7 +1099,35 @@ function ChatView({
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // "Delete for me" is a per-device/local hide — no schema change needed.
+  const hiddenKey = `hidden_messages_${group.id}_${channel}`;
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(hiddenKey) || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Typing indicator (Supabase realtime broadcast, no DB writes involved).
+  const channelRef = useRef<any>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const lastTypingSentRef = useRef(0);
+
+  function notifyTyping() {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return;
+    lastTypingSentRef.current = now;
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { userId, name: myName },
+    });
+  }
 
   async function load() {
     const { data } = await db
@@ -909,9 +1155,25 @@ function ChatView({
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         },
       )
+      .on("broadcast", { event: "typing" }, ({ payload }: any) => {
+        if (!payload || payload.userId === userId) return;
+        setTypingUsers((prev) => ({ ...prev, [payload.userId]: payload.name || "حد" }));
+        if (typingTimeouts.current[payload.userId]) clearTimeout(typingTimeouts.current[payload.userId]);
+        typingTimeouts.current[payload.userId] = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[payload.userId];
+            return next;
+          });
+        }, 3000);
+      })
       .subscribe();
+    channelRef.current = ch;
     return () => {
       db.removeChannel(ch);
+      channelRef.current = null;
+      Object.values(typingTimeouts.current).forEach(clearTimeout);
+      typingTimeouts.current = {};
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group.id, channel]);
@@ -985,32 +1247,93 @@ function ChatView({
     else toast.success("اتعمله pin");
   }
 
-  async function deleteMessage(messageId: string) {
+  async function addToAnnouncements(m: MessageRow) {
+    const { error } = await db.from("group_messages").insert({
+      group_id: group.id,
+      sender_id: m.sender_id,
+      channel: "announcements",
+      type: m.type,
+      content: m.content,
+      media_url: m.media_url,
+      media_size_bytes: (m as any).media_size_bytes,
+    });
+    if (error) toast.error(error.message);
+    else toast.success("اتضافت للإعلانات");
+  }
+
+  // Admin (or the anyone within the time window) — removes for everyone.
+  async function deleteForEveryone(messageId: string) {
     await db.from("group_messages").update({ is_deleted: true }).eq("id", messageId);
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
   }
 
+  // Local-only hide — the message stays for everyone else.
+  function deleteForMe(messageId: string) {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.add(messageId);
+      try {
+        localStorage.setItem(hiddenKey, JSON.stringify([...next]));
+      } catch {
+        /* ignore quota errors */
+      }
+      return next;
+    });
+  }
+
+  const visibleMessages = messages.filter((m) => !hiddenIds.has(m.id));
+
   return (
     <div className="flex h-[500px] flex-col">
       <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
-        {messages.map((m) => {
+        {visibleMessages.map((m) => {
           const isSelf = m.sender_id === userId;
+          const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
+          const isTemp = m.id.startsWith("temp-");
           return (
-            <div key={m.id} className={`group flex ${isSelf ? "justify-start" : "justify-end"}`}>
+            <div key={m.id} className={`flex items-end gap-1 ${isSelf ? "justify-start" : "justify-end"}`}>
+              {isSelf && !isTemp && (
+                <MessageActions
+                  message={m}
+                  isSelf={isSelf}
+                  isAdmin={isAdmin}
+                  channel={channel}
+                  onDeleteForMe={deleteForMe}
+                  onDeleteForEveryone={deleteForEveryone}
+                  onPin={pinMessage}
+                  onAddToAnnouncements={addToAnnouncements}
+                />
+              )}
               <div
-                className={`relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
-                  isSelf
-                    ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
-                    : "rounded-bl-md border border-border/50 bg-card/70"
-                }`}
+                className={
+                  isMedia
+                    ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
+                    : `relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                        isSelf
+                          ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
+                          : "rounded-bl-md border border-border/50 bg-card/70"
+                      }`
+                }
               >
                 {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+
                 {m.type === "image" && m.media_url && (
-                  <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
+                  <div className="relative">
+                    <img
+                      src={m.media_url}
+                      onClick={() => setLightboxUrl(m.media_url!)}
+                      className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                      {formatTime(m.created_at)}
+                    </span>
+                  </div>
                 )}
+
                 {m.type === "video" && m.media_url && (
-                  <video src={m.media_url} controls className="max-h-64 rounded-xl" />
+                  <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
                 )}
+
                 {m.type === "audio" && m.media_url && (
                   <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
                 )}
@@ -1028,33 +1351,28 @@ function ChatView({
                   </p>
                 )}
 
-                <span
-                  className={`mt-1 block text-left text-[10px] ${
-                    isSelf ? "text-primary-foreground/70" : "text-foreground/40"
-                  }`}
-                >
-                  {formatTime(m.created_at)}
-                </span>
-
-                {isAdmin && !m.id.startsWith("temp-") && (
-                  <div className="absolute -top-3 right-1 hidden gap-1 group-hover:flex">
-                    <button
-                      onClick={() => pinMessage(m.id)}
-                      className="rounded-full bg-background/90 p-1 shadow"
-                      title="Pin"
-                    >
-                      <Pin className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => deleteMessage(m.id)}
-                      className="rounded-full bg-background/90 p-1 shadow"
-                      title="حذف"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
+                {!isMedia && (
+                  <span
+                    className={`mt-1 block text-left text-[10px] ${
+                      isSelf ? "text-primary-foreground/70" : "text-foreground/40"
+                    }`}
+                  >
+                    {formatTime(m.created_at)}
+                  </span>
                 )}
               </div>
+              {!isSelf && !isTemp && (
+                <MessageActions
+                  message={m}
+                  isSelf={isSelf}
+                  isAdmin={isAdmin}
+                  channel={channel}
+                  onDeleteForMe={deleteForMe}
+                  onDeleteForEveryone={deleteForEveryone}
+                  onPin={pinMessage}
+                  onAddToAnnouncements={addToAnnouncements}
+                />
+              )}
             </div>
           );
         })}
@@ -1063,9 +1381,13 @@ function ChatView({
 
       <Composer
         text={text}
-        onTextChange={setText}
+        onTextChange={(v) => {
+          setText(v);
+          if (v.trim()) notifyTyping();
+        }}
         onSend={sendText}
         onPickFile={(f) => void sendFile(f)}
+        onSendVoice={(blob) => void sendFile(blobToFile(blob))}
         uploading={uploading}
         disabled={readOnly || muted}
         disabledMessage={
@@ -1073,7 +1395,10 @@ function ChatView({
             ? "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
             : "انت متكتوم دلوقتي في الجروب ده"
         }
+        typingNames={Object.values(typingUsers)}
       />
+
+      {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
     </div>
   );
 }
@@ -1610,26 +1935,42 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
     if (error) toast.error(error.message);
   }
 
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   return (
     <div className="flex h-[500px] flex-col">
       <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
         {messages.map((m) => {
           const isSelf = m.sender_id === userId;
+          const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
           return (
             <div key={m.id} className={`flex ${isSelf ? "justify-start" : "justify-end"}`}>
               <div
-                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
-                  isSelf
-                    ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
-                    : "rounded-bl-md border border-border/50 bg-card/70"
-                }`}
+                className={
+                  isMedia
+                    ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
+                    : `max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                        isSelf
+                          ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
+                          : "rounded-bl-md border border-border/50 bg-card/70"
+                      }`
+                }
               >
                 {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
                 {m.type === "image" && m.media_url && (
-                  <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
+                  <div className="relative">
+                    <img
+                      src={m.media_url}
+                      onClick={() => setLightboxUrl(m.media_url!)}
+                      className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                      {formatTime(m.created_at)}
+                    </span>
+                  </div>
                 )}
                 {m.type === "video" && m.media_url && (
-                  <video src={m.media_url} controls className="max-h-64 rounded-xl" />
+                  <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
                 )}
                 {m.type === "audio" && m.media_url && (
                   <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
@@ -1642,13 +1983,15 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
                     tint={isSelf ? "self" : "other"}
                   />
                 )}
-                <span
-                  className={`mt-1 block text-left text-[10px] ${
-                    isSelf ? "text-primary-foreground/70" : "text-foreground/40"
-                  }`}
-                >
-                  {formatTime(m.created_at)}
-                </span>
+                {!isMedia && (
+                  <span
+                    className={`mt-1 block text-left text-[10px] ${
+                      isSelf ? "text-primary-foreground/70" : "text-foreground/40"
+                    }`}
+                  >
+                    {formatTime(m.created_at)}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -1660,8 +2003,10 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         onTextChange={setText}
         onSend={sendText}
         onPickFile={(f) => void sendFile(f)}
+        onSendVoice={(blob) => void sendFile(blobToFile(blob))}
         uploading={uploading}
       />
+      {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
     </div>
   );
 }
