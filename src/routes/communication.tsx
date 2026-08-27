@@ -21,7 +21,25 @@ import {
   MessageSquare,
   MessageCircle,
   Search,
+  ChevronDown,
+  MoreVertical,
+  FolderTree,
+  Hash,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +74,37 @@ type GroupRow = {
   description: string | null;
   subject: string | null;
   created_by: string;
+  // Sub-groups: a group with parent_group_id = null is a top-level
+  // "community" that can contain child groups (WhatsApp-communities style).
+  parent_group_id?: string | null;
 };
+
+// Small deterministic gradient avatar so groups don't need a real image.
+const AVATAR_GRADIENTS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-amber-500 to-rose-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-rose-500 to-orange-400",
+  "from-indigo-500 to-purple-500",
+];
+function avatarGradient(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+function GroupAvatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+  const dims = size === "sm" ? "h-8 w-8 text-xs" : size === "lg" ? "h-12 w-12 text-lg" : "h-9 w-9 text-sm";
+  return (
+    <span
+      className={`flex ${dims} shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${avatarGradient(
+        name,
+      )} font-display font-bold text-white`}
+    >
+      {name.trim().charAt(0) || "?"}
+    </span>
+  );
+}
 
 type MessageRow = {
   id: string;
@@ -105,6 +153,80 @@ function fileNameFromUrl(url: string) {
   } catch {
     return "ملف";
   }
+}
+
+function formatTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+// Shared composer bar used by both group chat and DMs — one pill-shaped
+// input instead of separate boxy controls.
+function Composer({
+  text,
+  onTextChange,
+  onSend,
+  onPickFile,
+  uploading,
+  disabled,
+  disabledMessage,
+}: {
+  text: string;
+  onTextChange: (v: string) => void;
+  onSend: () => void;
+  onPickFile: (file: File) => void;
+  uploading: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  if (disabled) {
+    return (
+      <p className="mt-3 rounded-full border border-border/60 bg-card/40 px-4 py-2.5 text-center text-xs text-foreground/60">
+        {disabledMessage}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 py-1 pl-1.5 pr-3 backdrop-blur">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPickFile(f);
+          e.target.value = "";
+        }}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        title="إرفاق صورة/فيديو/صوت/ملف"
+        className="shrink-0 rounded-full p-2 text-foreground/60 transition hover:bg-background/60 hover:text-foreground disabled:opacity-50"
+      >
+        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+      </button>
+      <input
+        value={text}
+        onChange={(e) => onTextChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSend()}
+        placeholder="اكتب رسالة..."
+        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/40"
+      />
+      <button
+        onClick={onSend}
+        disabled={!text.trim()}
+        className="flex shrink-0 items-center justify-center rounded-full bg-gradient-cosmic p-2.5 text-primary-foreground transition disabled:opacity-40"
+      >
+        <Send className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 // Discord-style attachment card: icon + name + size + download, no giant
@@ -157,6 +279,9 @@ function CommunicationPage() {
   const [myLevel, setMyLevel] = useState(0); // 0 none · 1 member · 2 admin/doctor/assistant · 3 big boss
   const [busy, setBusy] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  // When set, the create-group dialog opens pre-scoped to add a sub-group
+  // inside this community instead of a brand-new top-level group.
+  const [createParentId, setCreateParentId] = useState<string | null>(null);
 
   const [activeConversation, setActiveConversation] = useState<{
     id: string;
@@ -194,17 +319,30 @@ function CommunicationPage() {
     })();
   }, [activeGroup, user]);
 
-  async function createGroup(name: string, description: string, subject: string) {
+  async function createGroup(
+    name: string,
+    description: string,
+    subject: string,
+    parentGroupId: string | null,
+  ) {
     if (!name.trim() || !user) return;
     const { data, error } = await db
       .from("groups")
-      .insert({ name, description, subject, created_by: user.id })
+      .insert({
+        name,
+        description,
+        subject,
+        created_by: user.id,
+        parent_group_id: parentGroupId,
+      })
       .select("*")
       .single();
     if (error) return toast.error(error.message);
     await db.from("group_members").insert({ group_id: data.id, user_id: user.id, status: "active" });
-    toast.success("اتعمل الجروب");
+    toast.success(parentGroupId ? "اتعمل الجروب الفرعي" : "اتعمل الجروب");
     setCreateOpen(false);
+    setCreateParentId(null);
+    setActiveGroup(data as GroupRow);
     await loadGroups();
   }
 
@@ -284,17 +422,34 @@ function CommunicationPage() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="font-display text-base">الجروبات</h2>
                 {canCreateGroups && (
-                  <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <Dialog
+                    open={createOpen}
+                    onOpenChange={(open) => {
+                      setCreateOpen(open);
+                      if (!open) setCreateParentId(null);
+                    }}
+                  >
                     <DialogTrigger asChild>
-                      <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 rounded-full"
+                        onClick={() => setCreateParentId(null)}
+                      >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
                     <DialogContent dir="rtl">
                       <DialogHeader>
-                        <DialogTitle>جروب جديد</DialogTitle>
+                        <DialogTitle>
+                          {createParentId ? "جروب فرعي جديد" : "جروب أو مجتمع جديد"}
+                        </DialogTitle>
                       </DialogHeader>
-                      <CreateGroupForm onCreate={createGroup} />
+                      <CreateGroupForm
+                        groups={groups}
+                        defaultParentId={createParentId}
+                        onCreate={createGroup}
+                      />
                     </DialogContent>
                   </Dialog>
                 )}
@@ -304,34 +459,18 @@ function CommunicationPage() {
               ) : groups.length === 0 ? (
                 <p className="text-xs text-foreground/60">مفيش جروبات لسه</p>
               ) : (
-                <div className="space-y-1.5">
-                  {groups.map((g) => (
-                    <div
-                      key={g.id}
-                      className={`group flex items-center rounded-xl transition ${
-                        activeGroup?.id === g.id
-                          ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
-                          : "hover:bg-card/60"
-                      }`}
-                    >
-                      <button
-                        onClick={() => setActiveGroup(g)}
-                        className="flex-1 truncate px-3 py-2 text-right text-sm"
-                      >
-                        {g.name}
-                      </button>
-                      {isBigBoss && (
-                        <button
-                          onClick={() => deleteGroup(g)}
-                          title="مسح الجروب نهائيًا (Big Boss)"
-                          className="ml-1 mr-1 shrink-0 rounded-full p-1.5 opacity-0 transition hover:bg-destructive/20 group-hover:opacity-100"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <GroupsTree
+                  groups={groups}
+                  activeGroupId={activeGroup?.id ?? null}
+                  onSelect={setActiveGroup}
+                  isBigBoss={isBigBoss}
+                  onDelete={deleteGroup}
+                  canCreateGroups={canCreateGroups}
+                  onAddSubgroup={(parentId) => {
+                    setCreateParentId(parentId);
+                    setCreateOpen(true);
+                  }}
+                />
               )}
             </>
           ) : (
@@ -350,7 +489,20 @@ function CommunicationPage() {
               اختار جروب من القايمة
             </div>
           ) : (
-            <GroupPanel group={activeGroup} myLevel={myLevel} userId={user.id} />
+            <GroupPanel
+              group={activeGroup}
+              groups={groups}
+              myLevel={myLevel}
+              userId={user.id}
+              isBigBoss={isBigBoss}
+              canCreateGroups={canCreateGroups}
+              onSelectGroup={setActiveGroup}
+              onAddSubgroup={(parentId) => {
+                setCreateParentId(parentId);
+                setCreateOpen(true);
+              }}
+              onDeleteGroup={deleteGroup}
+            />
           )
         ) : !activeConversation ? (
           <div className="cosmic-card flex min-h-[300px] items-center justify-center rounded-3xl p-8 text-sm text-foreground/60">
@@ -367,14 +519,150 @@ function CommunicationPage() {
   );
 }
 
+// ============================================================
+// Sidebar groups tree — top-level groups act as "communities" and can
+// contain sub-groups, similar to WhatsApp communities.
+// ============================================================
+function GroupsTree({
+  groups,
+  activeGroupId,
+  onSelect,
+  isBigBoss,
+  onDelete,
+  canCreateGroups,
+  onAddSubgroup,
+}: {
+  groups: GroupRow[];
+  activeGroupId: string | null;
+  onSelect: (g: GroupRow) => void;
+  isBigBoss: boolean;
+  onDelete: (g: GroupRow) => void;
+  canCreateGroups: boolean;
+  onAddSubgroup: (parentId: string) => void;
+}) {
+  const topLevel = groups.filter((g) => !g.parent_group_id);
+  const childrenOf = (id: string) => groups.filter((g) => g.parent_group_id === id);
+
+  const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    // Auto-expand the community that currently contains the active group.
+    const initial = new Set<string>();
+    if (activeGroup?.parent_group_id) initial.add(activeGroup.parent_group_id);
+    return initial;
+  });
+
+  function toggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function Row({ g, depth }: { g: GroupRow; depth: number }) {
+    const children = childrenOf(g.id);
+    const hasChildren = children.length > 0;
+    const isOpen = expanded.has(g.id);
+    const isActive = activeGroupId === g.id;
+    return (
+      <div>
+        <div
+          className={`group flex items-center gap-1 rounded-xl transition ${
+            isActive ? "bg-accent/15 text-accent" : "hover:bg-card/60"
+          }`}
+          style={{ paddingInlineStart: depth ? depth * 14 : 0 }}
+        >
+          {hasChildren ? (
+            <button
+              onClick={() => toggle(g.id)}
+              className="shrink-0 rounded-full p-1 text-foreground/50 transition hover:text-foreground"
+            >
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+              />
+            </button>
+          ) : (
+            <span className="w-3.5 shrink-0" />
+          )}
+          <button
+            onClick={() => onSelect(g)}
+            className="flex min-w-0 flex-1 items-center gap-2 py-2 text-right"
+          >
+            {depth === 0 ? (
+              <GroupAvatar name={g.name} size="sm" />
+            ) : (
+              <Hash className="h-3.5 w-3.5 shrink-0 opacity-50" />
+            )}
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{g.name}</span>
+            {hasChildren && (
+              <span className="shrink-0 rounded-full bg-background/60 px-1.5 py-0.5 text-[10px] text-foreground/50">
+                {children.length}
+              </span>
+            )}
+          </button>
+          <div className="flex shrink-0 items-center opacity-0 transition group-hover:opacity-100">
+            {canCreateGroups && depth === 0 && (
+              <button
+                onClick={() => onAddSubgroup(g.id)}
+                title="إضافة جروب فرعي"
+                className="rounded-full p-1.5 hover:bg-accent/15"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {isBigBoss && (
+              <button
+                onClick={() => onDelete(g)}
+                title="مسح نهائيًا (Big Boss)"
+                className="rounded-full p-1.5 hover:bg-destructive/20"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </button>
+            )}
+          </div>
+        </div>
+        {hasChildren && isOpen && (
+          <div className="space-y-0.5 border-r border-border/40 pr-2">
+            {children.map((c) => (
+              <Row key={c.id} g={c} depth={depth + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-0.5">
+      {topLevel.map((g) => (
+        <Row key={g.id} g={g} depth={0} />
+      ))}
+    </div>
+  );
+}
+
 function CreateGroupForm({
+  groups,
+  defaultParentId,
   onCreate,
 }: {
-  onCreate: (name: string, description: string, subject: string) => void;
+  groups: GroupRow[];
+  defaultParentId: string | null;
+  onCreate: (
+    name: string,
+    description: string,
+    subject: string,
+    parentGroupId: string | null,
+  ) => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [subject, setSubject] = useState("");
+  const [parentId, setParentId] = useState<string | null>(defaultParentId);
+  const communities = groups.filter((g) => !g.parent_group_id);
+  const lockedParent = communities.find((c) => c.id === defaultParentId);
+
   return (
     <div className="space-y-3">
       <Input placeholder="اسم الجروب" value={name} onChange={(e) => setName(e.target.value)} />
@@ -384,7 +672,33 @@ function CreateGroupForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
-      <Button className="w-full" onClick={() => onCreate(name, description, subject)}>
+
+      <div className="space-y-1.5">
+        <Label className="flex items-center gap-1.5 text-xs text-foreground/70">
+          <FolderTree className="h-3.5 w-3.5" /> جزء من مجتمع؟
+        </Label>
+        {lockedParent ? (
+          <p className="rounded-xl bg-card/60 px-3 py-2 text-sm">
+            هيتحط كجروب فرعي جوة <span className="font-semibold text-accent">{lockedParent.name}</span>
+          </p>
+        ) : (
+          <Select value={parentId ?? "none"} onValueChange={(v) => setParentId(v === "none" ? null : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="بدون — جروب مستقل" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">بدون — جروب مستقل / مجتمع جديد</SelectItem>
+              {communities.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  فرعي جوة: {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <Button className="w-full" onClick={() => onCreate(name, description, subject, parentId)}>
         إنشاء
       </Button>
     </div>
@@ -393,49 +707,119 @@ function CreateGroupForm({
 
 function GroupPanel({
   group,
+  groups,
   myLevel,
   userId,
+  isBigBoss: isGlobalBigBoss,
+  canCreateGroups,
+  onSelectGroup,
+  onAddSubgroup,
+  onDeleteGroup,
 }: {
   group: GroupRow;
+  groups: GroupRow[];
   myLevel: number;
   userId: string;
+  isBigBoss: boolean;
+  canCreateGroups: boolean;
+  onSelectGroup: (g: GroupRow) => void;
+  onAddSubgroup: (parentId: string) => void;
+  onDeleteGroup: (g: GroupRow) => void;
 }) {
   const isAdmin = myLevel >= 2;
   const isBigBoss = myLevel >= 3;
 
+  const parent = group.parent_group_id
+    ? groups.find((g) => g.id === group.parent_group_id) ?? null
+    : null;
+  const children = groups.filter((g) => g.parent_group_id === group.id);
+
   return (
     <div className="cosmic-card rounded-3xl p-4 md:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-xl">{group.name}</h2>
-          {group.description && (
-            <p className="text-xs text-foreground/60">{group.description}</p>
-          )}
+      {parent && (
+        <button
+          onClick={() => onSelectGroup(parent)}
+          className="mb-3 flex items-center gap-1 text-xs text-foreground/60 hover:text-accent"
+        >
+          <FolderTree className="h-3.5 w-3.5" /> {parent.name}
+          <span className="opacity-50">/</span>
+          <span className="text-foreground/80">{group.name}</span>
+        </button>
+      )}
+
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <GroupAvatar name={group.name} size="lg" />
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-xl">{group.name}</h2>
+            <p className="truncate text-xs text-foreground/60">
+              {[group.subject, group.description].filter(Boolean).join(" · ") || "من غير وصف"}
+            </p>
+          </div>
         </div>
+
+        {(canCreateGroups || isGlobalBigBoss) && !parent && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="secondary" className="h-8 w-8 shrink-0 rounded-full">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" dir="rtl">
+              {canCreateGroups && (
+                <DropdownMenuItem onClick={() => onAddSubgroup(group.id)}>
+                  <Plus className="ml-2 h-3.5 w-3.5" /> إضافة جروب فرعي
+                </DropdownMenuItem>
+              )}
+              {isGlobalBigBoss && (
+                <DropdownMenuItem
+                  onClick={() => onDeleteGroup(group)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="ml-2 h-3.5 w-3.5" /> مسح الجروب نهائيًا
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
+      {children.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {children.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onSelectGroup(c)}
+              className="flex items-center gap-1 rounded-full border border-border/60 bg-card/50 px-2.5 py-1 text-xs transition hover:border-accent/50 hover:text-accent"
+            >
+              <Hash className="h-3 w-3" /> {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <Tabs defaultValue="chat" dir="rtl">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="chat">
+        <TabsList className="w-full flex-nowrap justify-start gap-1 overflow-x-auto scrollbar-none">
+          <TabsTrigger value="chat" className="shrink-0">
             <MessageSquare className="ml-1 h-3.5 w-3.5" /> الشات
           </TabsTrigger>
-          <TabsTrigger value="announcements">
+          <TabsTrigger value="announcements" className="shrink-0">
             <Megaphone className="ml-1 h-3.5 w-3.5" /> الإعلانات
           </TabsTrigger>
-          <TabsTrigger value="pins">
+          <TabsTrigger value="pins" className="shrink-0">
             <Pin className="ml-1 h-3.5 w-3.5" /> Pins
           </TabsTrigger>
-          <TabsTrigger value="media">
+          <TabsTrigger value="media" className="shrink-0">
             <Images className="ml-1 h-3.5 w-3.5" /> الوسائط
           </TabsTrigger>
-          <TabsTrigger value="links">
+          <TabsTrigger value="links" className="shrink-0">
             <Link2 className="ml-1 h-3.5 w-3.5" /> الروابط
           </TabsTrigger>
-          <TabsTrigger value="schedule">
+          <TabsTrigger value="schedule" className="shrink-0">
             <CalendarClock className="ml-1 h-3.5 w-3.5" /> الجدول
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="members">
+            <TabsTrigger value="members" className="shrink-0">
               <Users className="ml-1 h-3.5 w-3.5" /> الأعضاء
             </TabsTrigger>
           )}
@@ -497,9 +881,7 @@ function ChatView({
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const { data } = await db
@@ -570,7 +952,6 @@ function ChatView({
       },
     ]);
     setUploading(true);
-    setProgress(0);
 
     const path = `${group.id}/${Date.now()}-${file.name}`;
     const { error: upErr } = await db.storage.from("group-media").upload(path, file, {
@@ -611,106 +992,88 @@ function ChatView({
 
   return (
     <div className="flex h-[500px] flex-col">
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`group relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-              m.sender_id === userId
-                ? "mr-auto bg-accent/90 text-accent-foreground"
-                : "ml-auto bg-card/80 border border-border/50"
-            }`}
-          >
-            {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-            {m.type === "image" && m.media_url && (
-              <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
-            )}
-            {m.type === "video" && m.media_url && (
-              <video src={m.media_url} controls className="max-h-64 rounded-xl" />
-            )}
-            {m.type === "audio" && m.media_url && (
-              <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
-            )}
-            {m.type === "file" && m.media_url && (
-              <FileCard
-                name={m.content || fileNameFromUrl(m.media_url)}
-                url={m.media_url}
-                size={(m as any).media_size_bytes}
-                tint={m.sender_id === userId ? "self" : "other"}
-              />
-            )}
-            {m.type !== "text" && !m.media_url && (
-              <p className="flex items-center gap-1.5 text-xs opacity-70">
-                <Loader2 className="h-3 w-3 animate-spin" /> {m.content}
-              </p>
-            )}
+      <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
+        {messages.map((m) => {
+          const isSelf = m.sender_id === userId;
+          return (
+            <div key={m.id} className={`group flex ${isSelf ? "justify-start" : "justify-end"}`}>
+              <div
+                className={`relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                  isSelf
+                    ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
+                    : "rounded-bl-md border border-border/50 bg-card/70"
+                }`}
+              >
+                {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                {m.type === "image" && m.media_url && (
+                  <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
+                )}
+                {m.type === "video" && m.media_url && (
+                  <video src={m.media_url} controls className="max-h-64 rounded-xl" />
+                )}
+                {m.type === "audio" && m.media_url && (
+                  <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
+                )}
+                {m.type === "file" && m.media_url && (
+                  <FileCard
+                    name={m.content || fileNameFromUrl(m.media_url)}
+                    url={m.media_url}
+                    size={(m as any).media_size_bytes}
+                    tint={isSelf ? "self" : "other"}
+                  />
+                )}
+                {m.type !== "text" && !m.media_url && (
+                  <p className="flex items-center gap-1.5 text-xs opacity-70">
+                    <Loader2 className="h-3 w-3 animate-spin" /> {m.content}
+                  </p>
+                )}
 
-            {isAdmin && !m.id.startsWith("temp-") && (
-              <div className="absolute -top-3 right-1 hidden gap-1 group-hover:flex">
-                <button
-                  onClick={() => pinMessage(m.id)}
-                  className="rounded-full bg-background/90 p-1 shadow"
-                  title="Pin"
+                <span
+                  className={`mt-1 block text-left text-[10px] ${
+                    isSelf ? "text-primary-foreground/70" : "text-foreground/40"
+                  }`}
                 >
-                  <Pin className="h-3 w-3" />
-                </button>
-                <button
-                  onClick={() => deleteMessage(m.id)}
-                  className="rounded-full bg-background/90 p-1 shadow"
-                  title="حذف"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+                  {formatTime(m.created_at)}
+                </span>
+
+                {isAdmin && !m.id.startsWith("temp-") && (
+                  <div className="absolute -top-3 right-1 hidden gap-1 group-hover:flex">
+                    <button
+                      onClick={() => pinMessage(m.id)}
+                      className="rounded-full bg-background/90 p-1 shadow"
+                      title="Pin"
+                    >
+                      <Pin className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => deleteMessage(m.id)}
+                      className="rounded-full bg-background/90 p-1 shadow"
+                      title="حذف"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 
-      {readOnly ? (
-        <p className="mt-3 rounded-xl border border-border/60 px-3 py-2 text-center text-xs text-foreground/60">
-          القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها
-        </p>
-      ) : muted ? (
-        <p className="mt-3 rounded-xl border border-destructive/50 px-3 py-2 text-center text-xs text-destructive">
-          انت متكتوم دلوقتي في الجروب ده
-        </p>
-      ) : (
-        <div className="mt-3 flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void sendFile(f);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            size="icon"
-            variant="secondary"
-            className="rounded-full"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-            title="إرفاق صورة/فيديو/صوت"
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-          </Button>
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendText()}
-            placeholder="اكتب رسالة..."
-            className="flex-1"
-          />
-          <Button size="icon" className="rounded-full" onClick={sendText}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+      <Composer
+        text={text}
+        onTextChange={setText}
+        onSend={sendText}
+        onPickFile={(f) => void sendFile(f)}
+        uploading={uploading}
+        disabled={readOnly || muted}
+        disabledMessage={
+          readOnly
+            ? "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
+            : "انت متكتوم دلوقتي في الجروب ده"
+        }
+      />
     </div>
   );
 }
@@ -984,10 +1347,21 @@ function MembersView({
   }
 
   return (
-    <div className="space-y-2 py-2">
+    <div className="space-y-1.5 py-2">
       {members.map((m) => (
-        <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-card/60 px-3 py-2 text-sm">
-          <span>{m.full_name}</span>
+        <div
+          key={m.id}
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/40 bg-card/50 px-3 py-2 text-sm"
+        >
+          <span className="flex items-center gap-2">
+            <GroupAvatar name={m.full_name || "?"} size="sm" />
+            {m.full_name}
+            {m.status === "banned" && (
+              <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive">
+                محظور
+              </span>
+            )}
+          </span>
           <div className="flex items-center gap-1.5">
             {m.status === "active" ? (
               <button onClick={() => ban(m.user_id)} title="حظر" className="rounded-full bg-background/80 p-1.5">
@@ -1096,13 +1470,12 @@ function DMList({
             <button
               key={c.id}
               onClick={() => onOpen(c)}
-              className={`block w-full truncate rounded-xl px-3 py-2 text-right text-sm transition ${
-                activeConversationId === c.id
-                  ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
-                  : "hover:bg-card/60"
+              className={`flex w-full items-center gap-2 truncate rounded-xl px-2.5 py-2 text-right text-sm transition ${
+                activeConversationId === c.id ? "bg-accent/15 text-accent" : "hover:bg-card/60"
               }`}
             >
-              {c.otherName}
+              <GroupAvatar name={c.otherName} size="sm" />
+              <span className="truncate">{c.otherName}</span>
             </button>
           ))}
         </div>
@@ -1148,8 +1521,9 @@ function SearchUsers({ onPick }: { onPick: (id: string, name: string) => void })
           <button
             key={r.id}
             onClick={() => onPick(r.id, r.full_name)}
-            className="block w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-card/60"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-right text-sm hover:bg-card/60"
           >
+            <GroupAvatar name={r.full_name} size="sm" />
             {r.full_name}
           </button>
         ))}
@@ -1163,7 +1537,6 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const { data } = await db
@@ -1239,64 +1612,56 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
 
   return (
     <div className="flex h-[500px] flex-col">
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-              m.sender_id === userId
-                ? "mr-auto bg-accent/90 text-accent-foreground"
-                : "ml-auto bg-card/80 border border-border/50"
-            }`}
-          >
-            {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-            {m.type === "image" && m.media_url && <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />}
-            {m.type === "video" && m.media_url && <video src={m.media_url} controls className="max-h-64 rounded-xl" />}
-            {m.type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />}
-            {m.type === "file" && m.media_url && (
-              <FileCard
-                name={m.content || fileNameFromUrl(m.media_url)}
-                url={m.media_url}
-                size={m.media_size_bytes}
-                tint={m.sender_id === userId ? "self" : "other"}
-              />
-            )}
-          </div>
-        ))}
+      <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
+        {messages.map((m) => {
+          const isSelf = m.sender_id === userId;
+          return (
+            <div key={m.id} className={`flex ${isSelf ? "justify-start" : "justify-end"}`}>
+              <div
+                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                  isSelf
+                    ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
+                    : "rounded-bl-md border border-border/50 bg-card/70"
+                }`}
+              >
+                {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                {m.type === "image" && m.media_url && (
+                  <img src={m.media_url} className="max-h-64 rounded-xl object-cover" />
+                )}
+                {m.type === "video" && m.media_url && (
+                  <video src={m.media_url} controls className="max-h-64 rounded-xl" />
+                )}
+                {m.type === "audio" && m.media_url && (
+                  <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
+                )}
+                {m.type === "file" && m.media_url && (
+                  <FileCard
+                    name={m.content || fileNameFromUrl(m.media_url)}
+                    url={m.media_url}
+                    size={m.media_size_bytes}
+                    tint={isSelf ? "self" : "other"}
+                  />
+                )}
+                <span
+                  className={`mt-1 block text-left text-[10px] ${
+                    isSelf ? "text-primary-foreground/70" : "text-foreground/40"
+                  }`}
+                >
+                  {formatTime(m.created_at)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void sendFile(f);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          size="icon"
-          variant="secondary"
-          className="rounded-full"
-          disabled={uploading}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-        </Button>
-        <Input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendText()}
-          placeholder="اكتب رسالة..."
-          className="flex-1"
-        />
-        <Button size="icon" className="rounded-full" onClick={sendText}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
+      <Composer
+        text={text}
+        onTextChange={setText}
+        onSend={sendText}
+        onPickFile={(f) => void sendFile(f)}
+        uploading={uploading}
+      />
     </div>
   );
 }
