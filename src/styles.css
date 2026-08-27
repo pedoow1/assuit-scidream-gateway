@@ -153,6 +153,13 @@
 @utility shadow-rose {
   box-shadow: var(--shadow-rose);
 }
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 
 /* Glass card — dark glass over space background */
 @utility cosmic-card {
