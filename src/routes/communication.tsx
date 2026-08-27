@@ -19,6 +19,8 @@ import {
   Link2,
   Images,
   MessageSquare,
+  MessageCircle,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -91,13 +93,22 @@ const DAYS: { key: string; label: string }[] = [
 function CommunicationPage() {
   const { user, loading, roles } = useAuth();
   const navigate = useNavigate();
-  const isBigBoss = roles?.includes("super_admin");
+  const isBigBoss = !!roles?.includes("super_admin");
+  const canCreateGroups = isBigBoss || !!roles?.includes("admin");
+
+  const [mode, setMode] = useState<"groups" | "dm">("groups");
 
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupRow | null>(null);
   const [myLevel, setMyLevel] = useState(0); // 0 none · 1 member · 2 admin/doctor/assistant · 3 big boss
   const [busy, setBusy] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+
+  const [activeConversation, setActiveConversation] = useState<{
+    id: string;
+    otherId: string;
+    otherName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -143,6 +154,35 @@ function CommunicationPage() {
     await loadGroups();
   }
 
+  // Big Boss only: wipe every file that belongs to the group from Storage,
+  // THEN delete the group row (DB cascade takes care of every related
+  // table: messages, members, pins, schedules, reports, audit log...).
+  async function deleteGroup(group: GroupRow) {
+    if (!isBigBoss) return;
+    const confirmed = window.confirm(
+      `متأكد إنك عايز تمسح جروب "${group.name}"؟ ده هيمسح كل الرسايل والصور والفيديوهات بتاعته نهائيًا ومش هترجع.`,
+    );
+    if (!confirmed) return;
+
+    const { data: files, error: listErr } = await db.storage.from("group-media").list(group.id, {
+      limit: 1000,
+    });
+    if (listErr) {
+      toast.error("حصلت مشكلة في قراءة ملفات الجروب: " + listErr.message);
+    } else if (files && files.length > 0) {
+      const paths = files.map((f: { name: string }) => `${group.id}/${f.name}`);
+      const { error: removeErr } = await db.storage.from("group-media").remove(paths);
+      if (removeErr) toast.error("حصلت مشكلة في مسح الملفات: " + removeErr.message);
+    }
+
+    const { error } = await db.from("groups").delete().eq("id", group.id);
+    if (error) return toast.error(error.message);
+
+    toast.success("اتمسح الجروب وكل حاجة تخصه");
+    if (activeGroup?.id === group.id) setActiveGroup(null);
+    await loadGroups();
+  }
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -164,56 +204,109 @@ function CommunicationPage() {
       </header>
 
       <main className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-8 md:grid-cols-[280px_1fr]">
-        {/* Groups sidebar */}
+        {/* Sidebar */}
         <aside className="cosmic-card rounded-3xl p-4 h-fit">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-base">الجروبات</h2>
-            {isBigBoss && (
-              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent dir="rtl">
-                  <DialogHeader>
-                    <DialogTitle>جروب جديد</DialogTitle>
-                  </DialogHeader>
-                  <CreateGroupForm onCreate={createGroup} />
-                </DialogContent>
-              </Dialog>
-            )}
+          <div className="mb-3 flex gap-1.5 rounded-full bg-background/40 p-1">
+            <button
+              onClick={() => setMode("groups")}
+              className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+                mode === "groups" ? "bg-gradient-cosmic text-primary-foreground" : "text-foreground/60"
+              }`}
+            >
+              <Users className="ml-1 inline h-3.5 w-3.5" /> الجروبات
+            </button>
+            <button
+              onClick={() => setMode("dm")}
+              className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+                mode === "dm" ? "bg-gradient-cosmic text-primary-foreground" : "text-foreground/60"
+              }`}
+            >
+              <MessageCircle className="ml-1 inline h-3.5 w-3.5" /> الخاص
+            </button>
           </div>
-          {busy ? (
-            <Loader2 className="h-5 w-5 animate-spin text-accent" />
-          ) : groups.length === 0 ? (
-            <p className="text-xs text-foreground/60">مفيش جروبات لسه</p>
+
+          {mode === "groups" ? (
+            <>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-display text-base">الجروبات</h2>
+                {canCreateGroups && (
+                  <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent dir="rtl">
+                      <DialogHeader>
+                        <DialogTitle>جروب جديد</DialogTitle>
+                      </DialogHeader>
+                      <CreateGroupForm onCreate={createGroup} />
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+              {busy ? (
+                <Loader2 className="h-5 w-5 animate-spin text-accent" />
+              ) : groups.length === 0 ? (
+                <p className="text-xs text-foreground/60">مفيش جروبات لسه</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {groups.map((g) => (
+                    <div
+                      key={g.id}
+                      className={`group flex items-center rounded-xl transition ${
+                        activeGroup?.id === g.id
+                          ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
+                          : "hover:bg-card/60"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setActiveGroup(g)}
+                        className="flex-1 truncate px-3 py-2 text-right text-sm"
+                      >
+                        {g.name}
+                      </button>
+                      {isBigBoss && (
+                        <button
+                          onClick={() => deleteGroup(g)}
+                          title="مسح الجروب نهائيًا (Big Boss)"
+                          className="ml-1 mr-1 shrink-0 rounded-full p-1.5 opacity-0 transition hover:bg-destructive/20 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="space-y-1.5">
-              {groups.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setActiveGroup(g)}
-                  className={`block w-full rounded-xl px-3 py-2 text-right text-sm transition ${
-                    activeGroup?.id === g.id
-                      ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
-                      : "hover:bg-card/60"
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
+            <DMList
+              userId={user.id}
+              activeConversationId={activeConversation?.id ?? null}
+              onOpen={(c) => setActiveConversation(c)}
+            />
           )}
         </aside>
 
-        {/* Active group panel */}
-        {!activeGroup ? (
+        {/* Main panel */}
+        {mode === "groups" ? (
+          !activeGroup ? (
+            <div className="cosmic-card flex min-h-[300px] items-center justify-center rounded-3xl p-8 text-sm text-foreground/60">
+              اختار جروب من القايمة
+            </div>
+          ) : (
+            <GroupPanel group={activeGroup} myLevel={myLevel} userId={user.id} />
+          )
+        ) : !activeConversation ? (
           <div className="cosmic-card flex min-h-[300px] items-center justify-center rounded-3xl p-8 text-sm text-foreground/60">
-            اختار جروب من القايمة
+            اختار حد تكلمه أو دور على شخص جديد
           </div>
         ) : (
-          <GroupPanel group={activeGroup} myLevel={myLevel} userId={user.id} />
+          <div className="cosmic-card rounded-3xl p-4 md:p-6">
+            <h2 className="mb-4 font-display text-xl">{activeConversation.otherName}</h2>
+            <DMChatView conversationId={activeConversation.id} userId={user.id} />
+          </div>
         )}
       </main>
     </div>
@@ -771,13 +864,18 @@ function MembersView({
   const [newAdminId, setNewAdminId] = useState("");
 
   async function load() {
-    const { data } = await db
-      .from("group_members")
-      .select("*, profiles(full_name)")
-      .eq("group_id", groupId);
-    setMembers(
-      (data ?? []).map((m: any) => ({ ...m, full_name: m.profiles?.full_name ?? m.user_id })),
-    );
+    const { data } = await db.from("group_members").select("*").eq("group_id", groupId);
+    const rows = data ?? [];
+    // Resolve names through the get_profile_names() RPC instead of embedding
+    // `profiles` directly — a per-group doctor/assistant isn't necessarily a
+    // global `admin`, and the base RLS on `profiles` would hide other
+    // students' names from them if we queried the table straight.
+    const ids = rows.map((r: any) => r.user_id);
+    const { data: names } = ids.length
+      ? await db.rpc("get_profile_names", { p_ids: ids })
+      : { data: [] };
+    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n.full_name]));
+    setMembers(rows.map((m: any) => ({ ...m, full_name: nameMap.get(m.user_id) ?? m.user_id })));
   }
   useEffect(() => {
     void load();
@@ -846,6 +944,282 @@ function MembersView({
       {members.length === 0 && (
         <p className="text-center text-sm text-foreground/60">مفيش أعضاء لسه</p>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// Direct messages ("الخاص")
+// ============================================================
+function DMList({
+  userId,
+  activeConversationId,
+  onOpen,
+}: {
+  userId: string;
+  activeConversationId: string | null;
+  onOpen: (c: { id: string; otherId: string; otherName: string }) => void;
+}) {
+  const [conversations, setConversations] = useState<
+    { id: string; otherId: string; otherName: string }[]
+  >([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [busy, setBusy] = useState(true);
+
+  async function load() {
+    setBusy(true);
+    const { data } = await db
+      .from("direct_conversations")
+      .select("*")
+      .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+      .order("created_at", { ascending: false });
+    const rows = data ?? [];
+    const otherIds = rows.map((r: any) => (r.user_a === userId ? r.user_b : r.user_a));
+    const { data: names } = otherIds.length
+      ? await db.rpc("get_profile_names", { p_ids: otherIds })
+      : { data: [] };
+    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n.full_name]));
+    setConversations(
+      rows.map((r: any) => {
+        const otherId = r.user_a === userId ? r.user_b : r.user_a;
+        return { id: r.id, otherId, otherName: nameMap.get(otherId) ?? "مستخدم" };
+      }),
+    );
+    setBusy(false);
+  }
+
+  useEffect(() => {
+    void load();
+  }, [userId]);
+
+  async function startWith(otherId: string, otherName: string) {
+    const { data, error } = await db.rpc("get_or_create_dm", { p_other_user: otherId });
+    if (error) return toast.error(error.message);
+    setSearchOpen(false);
+    onOpen({ id: data as string, otherId, otherName });
+    await load();
+  }
+
+  return (
+    <>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-display text-base">الخاص</h2>
+        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <DialogTrigger asChild>
+            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>ابدأ محادثة جديدة</DialogTitle>
+            </DialogHeader>
+            <SearchUsers onPick={startWith} />
+          </DialogContent>
+        </Dialog>
+      </div>
+      {busy ? (
+        <Loader2 className="h-5 w-5 animate-spin text-accent" />
+      ) : conversations.length === 0 ? (
+        <p className="text-xs text-foreground/60">مفيش محادثات لسه</p>
+      ) : (
+        <div className="space-y-1.5">
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onOpen(c)}
+              className={`block w-full truncate rounded-xl px-3 py-2 text-right text-sm transition ${
+                activeConversationId === c.id
+                  ? "bg-gradient-cosmic text-primary-foreground shadow-rose"
+                  : "hover:bg-card/60"
+              }`}
+            >
+              {c.otherName}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function SearchUsers({ onPick }: { onPick: (id: string, name: string) => void }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<{ id: string; full_name: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setBusy(true);
+      const { data, error } = await db.rpc("search_profiles", { p_query: q.trim() });
+      if (error) toast.error(error.message);
+      setResults((data as any[]) ?? []);
+      setBusy(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="دور بالاسم..."
+          className="pr-9"
+        />
+      </div>
+      {busy && <Loader2 className="h-4 w-4 animate-spin text-accent" />}
+      <div className="max-h-60 space-y-1 overflow-y-auto">
+        {results.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onPick(r.id, r.full_name)}
+            className="block w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-card/60"
+          >
+            {r.full_name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DMChatView({ conversationId, userId }: { conversationId: string; userId: string }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [text, setText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function load() {
+    const { data } = await db
+      .from("direct_messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    setMessages(data ?? []);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
+
+  useEffect(() => {
+    void load();
+    const ch = db
+      .channel(`dm-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "direct_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload: any) => {
+          setMessages((prev) => [...prev, payload.new]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        },
+      )
+      .subscribe();
+    return () => {
+      db.removeChannel(ch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  async function sendText() {
+    if (!text.trim()) return;
+    const body = text;
+    setText("");
+    const { error } = await db
+      .from("direct_messages")
+      .insert({ conversation_id: conversationId, sender_id: userId, type: "text", content: body });
+    if (error) toast.error(error.message);
+  }
+
+  async function sendFile(file: File) {
+    const type = file.type.startsWith("image")
+      ? "image"
+      : file.type.startsWith("video")
+        ? "video"
+        : file.type.startsWith("audio")
+          ? "audio"
+          : "image";
+    setUploading(true);
+    const path = `${conversationId}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await db.storage.from("dm-media").upload(path, file);
+    setUploading(false);
+    if (upErr) return toast.error(upErr.message);
+    // dm-media is a private bucket — build a signed URL instead of a public one
+    const { data: signed } = await db.storage.from("dm-media").createSignedUrl(path, 60 * 60 * 24 * 7);
+    const { error } = await db.from("direct_messages").insert({
+      conversation_id: conversationId,
+      sender_id: userId,
+      type,
+      media_url: signed?.signedUrl ?? null,
+      media_size_bytes: file.size,
+    });
+    if (error) toast.error(error.message);
+  }
+
+  return (
+    <div className="flex h-[500px] flex-col">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+              m.sender_id === userId
+                ? "mr-auto bg-gradient-cosmic text-primary-foreground"
+                : "ml-auto bg-card/70"
+            }`}
+          >
+            {m.type === "text" && <p>{m.content}</p>}
+            {m.type === "image" && m.media_url && <img src={m.media_url} className="max-h-64 rounded-xl" />}
+            {m.type === "video" && m.media_url && <video src={m.media_url} controls className="max-h-64 rounded-xl" />}
+            {m.type === "audio" && m.media_url && <audio src={m.media_url} controls />}
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void sendFile(f);
+            e.target.value = "";
+          }}
+        />
+        <Button
+          size="icon"
+          variant="secondary"
+          className="rounded-full"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+        </Button>
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendText()}
+          placeholder="اكتب رسالة..."
+          className="flex-1"
+        />
+        <Button size="icon" className="rounded-full" onClick={sendText}>
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
