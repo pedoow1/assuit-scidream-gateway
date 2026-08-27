@@ -14,6 +14,7 @@ import {
   FlaskConical,
   LayoutGrid,
   GraduationCap,
+  MessagesSquare,
 } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,7 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
   { icon: FileText, label: "ملاحظاتي", color: "from-rose/40 to-cosmic/40", to: "/notes" },
   { icon: Sparkles, label: "المساعد الذكي", color: "from-gold/40 to-cosmic/40", to: "/assistant" },
   { icon: Bell, label: "الإعلانات", color: "from-cosmic/40 to-gold/40", to: "/announcements" },
+  { icon: MessagesSquare, label: "التواصل", color: "from-rose/60 to-cosmic/40", to: "/communication" },
   { icon: GraduationCap, label: "دورات تدريبية", color: "from-gold/60 to-rose/60", to: "/courses" },
   {
     icon: FlaskConical,
