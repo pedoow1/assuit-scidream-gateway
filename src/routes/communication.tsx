@@ -95,8 +95,27 @@ function avatarGradient(seed: string) {
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
 }
-function GroupAvatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+function GroupAvatar({
+  name,
+  size = "md",
+  avatarUrl,
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg";
+  // Real profile picture, when we have one — falls back to the initial-letter
+  // gradient (used for groups, or users with no avatar_url).
+  avatarUrl?: string | null;
+}) {
   const dims = size === "sm" ? "h-8 w-8 text-xs" : size === "lg" ? "h-12 w-12 text-lg" : "h-9 w-9 text-sm";
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className={`${dims} shrink-0 rounded-full object-cover`}
+      />
+    );
+  }
   return (
     <span
       className={`flex ${dims} shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${avatarGradient(
@@ -1050,6 +1069,8 @@ function GroupPanel({
             userId={userId}
             myName={myName}
             isAdmin={isAdmin}
+            isBigBoss={isBigBoss}
+            isSiteAdmin={isSiteAdmin}
             muted={iAmMuted}
             banned={iAmBanned}
           />
@@ -1061,11 +1082,14 @@ function GroupPanel({
             userId={userId}
             myName={myName}
             isAdmin={isAdmin}
+            isBigBoss={isBigBoss}
+            isSiteAdmin={isSiteAdmin}
             muted={iAmMuted}
             banned={iAmBanned}
             readOnly={!isAdmin}
           />
         </TabsContent>
+
         <TabsContent value="pins">
           <PinsView groupId={group.id} />
         </TabsContent>
@@ -1103,6 +1127,7 @@ function MessageActions({
   message,
   isSelf,
   isAdmin,
+  canDeleteForEveryone,
   channel,
   onDeleteForMe,
   onDeleteForEveryone,
@@ -1112,15 +1137,15 @@ function MessageActions({
   message: MessageRow;
   isSelf: boolean;
   isAdmin: boolean;
+  // Pre-computed per-message: true only if this actor actually outranks the
+  // sender (or it's their own recent message) — see canModerate().
+  canDeleteForEveryone: boolean;
   channel: "general" | "announcements";
   onDeleteForMe: (id: string) => void;
   onDeleteForEveryone: (id: string) => void;
   onPin: (id: string) => void;
   onAddToAnnouncements: (m: MessageRow) => void;
 }) {
-  const withinWindow = Date.now() - new Date(message.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
-  const canDeleteForEveryone = isAdmin || (isSelf && withinWindow);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1164,6 +1189,8 @@ function ChatView({
   userId,
   myName,
   isAdmin,
+  isBigBoss,
+  isSiteAdmin,
   muted,
   banned = false,
   readOnly = false,
@@ -1173,11 +1200,31 @@ function ChatView({
   userId: string;
   myName: string;
   isAdmin: boolean;
+  isBigBoss: boolean;
+  isSiteAdmin: boolean;
   muted: boolean;
   banned?: boolean;
   readOnly?: boolean;
 }) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
+  // Sender role info for the group — lets "delete for everyone" follow the
+  // same hierarchy as banning/muting (canModerate) instead of a flat
+  // "isAdmin can nuke anything" rule.
+  const [senderBadges, setSenderBadges] = useState<Map<string, MemberBadgeInfo>>(new Map());
+  const iHaveGroupRole = !!senderBadges.get(userId)?.group_role;
+
+  useEffect(() => {
+    (async () => {
+      const { data: rows } = await db.from("group_members").select("user_id").eq("group_id", group.id);
+      const ids = (rows ?? []).map((r: any) => r.user_id);
+      if (!ids.length) {
+        setSenderBadges(new Map());
+        return;
+      }
+      const { data: badges } = await db.rpc("get_member_badges", { p_group_id: group.id, p_ids: ids });
+      setSenderBadges(new Map((badges ?? []).map((b: any) => [b.user_id, b as MemberBadgeInfo])));
+    })();
+  }, [group.id]);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -1234,6 +1281,21 @@ function ChatView({
           if (payload.new.channel !== channel) return;
           setMessages((prev) => [...prev, payload.new as MessageRow]);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "group_messages", filter: `group_id=eq.${group.id}` },
+        (payload: any) => {
+          if (payload.new.channel !== channel) return;
+          // Covers "delete for everyone" (is_deleted flips to true) as well as
+          // any other in-place edit — everyone in the chat sees it instantly,
+          // no refresh needed.
+          if (payload.new.is_deleted) {
+            setMessages((prev) => prev.filter((m) => m.id !== payload.new.id));
+          } else {
+            setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? (payload.new as MessageRow) : m)));
+          }
         },
       )
       .on("broadcast", { event: "typing" }, ({ payload }: any) => {
@@ -1375,6 +1437,22 @@ function ChatView({
           const isSelf = m.sender_id === userId;
           const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
           const isTemp = m.id.startsWith("temp-");
+          const withinWindow = Date.now() - new Date(m.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
+          // Own recent message: always deletable. Someone else's message:
+          // only if this actor actually outranks the sender in this group
+          // (mirrors the ban/mute hierarchy) — a regular member can never
+          // delete another member's message, a group admin can't touch a
+          // site admin's, etc.
+          const senderBadge = senderBadges.get(m.sender_id);
+          const canDeleteForEveryone = isSelf
+            ? withinWindow
+            : canModerate(userId, isBigBoss, isSiteAdmin, iHaveGroupRole, {
+                user_id: m.sender_id,
+                full_name: senderBadge?.full_name ?? "",
+                is_big_boss: !!senderBadge?.is_big_boss,
+                is_site_admin: !!senderBadge?.is_site_admin,
+                group_role: senderBadge?.group_role ?? null,
+              });
           return (
             <div key={m.id} className={`flex items-end gap-1 ${isSelf ? "justify-start" : "justify-end"}`}>
               {isSelf && !isTemp && (
@@ -1382,6 +1460,7 @@ function ChatView({
                   message={m}
                   isSelf={isSelf}
                   isAdmin={isAdmin}
+                  canDeleteForEveryone={canDeleteForEveryone}
                   channel={channel}
                   onDeleteForMe={deleteForMe}
                   onDeleteForEveryone={deleteForEveryone}
@@ -1451,6 +1530,7 @@ function ChatView({
                   message={m}
                   isSelf={isSelf}
                   isAdmin={isAdmin}
+                  canDeleteForEveryone={canDeleteForEveryone}
                   channel={channel}
                   onDeleteForMe={deleteForMe}
                   onDeleteForEveryone={deleteForEveryone}
@@ -1913,7 +1993,7 @@ function MembersView({
               params={{ userId: m.user_id }}
               className="flex min-w-0 items-center gap-2 hover:opacity-80"
             >
-              <GroupAvatar name={m.full_name || "?"} size="sm" />
+              <GroupAvatar name={m.full_name || "?"} size="sm" avatarUrl={m.avatar_url} />
               <span className="min-w-0 truncate">{m.full_name}</span>
               {badge && (
                 <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
