@@ -136,14 +136,31 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
       temperature: 0.4,
     };
 
-    const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // Don't let a stuck/slow upstream call hang the request forever — cap it
+    // at 25s so the client always gets *something* back instead of an
+    // endless spinner if Mistral is unreachable or slow.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25_000);
+
+    let res: Response;
+    try {
+      res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        throw new Error("المساعد ماردش في الوقت المناسب — حاول تاني");
+      }
+      throw new Error(`تعذر الاتصال بالمساعد: ${e?.message ?? "network error"}`);
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!res.ok) {
       const txt = await res.text();
