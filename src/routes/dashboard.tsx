@@ -10,6 +10,7 @@ import {
   Bell,
   ShieldCheck,
   LogOut,
+  UserCircle,
   MapPin,
   FlaskConical,
   LayoutGrid,
@@ -150,6 +151,12 @@ function Dashboard() {
             </div>
           </Link>
           <div className="flex items-center gap-3">
+            <Link
+              to="/profile"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-xs hover:border-accent"
+            >
+              <UserCircle className="h-3.5 w-3.5" /> بروفايلي
+            </Link>
             {isAdmin && (
               <Link
                 to="/admin"
