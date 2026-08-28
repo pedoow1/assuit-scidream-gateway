@@ -15,6 +15,7 @@ export interface ProfileRow {
   batch_year: number | null;
   avatar_url: string | null;
   display_title: string | null;
+  bio: string | null;
 }
 
 export type AppRole = "super_admin" | "admin" | "student" | "department_advisor" | "instructor";
