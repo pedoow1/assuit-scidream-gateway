@@ -38,8 +38,15 @@ function AssistantPage() {
     setInput("");
     setSending(true);
     try {
-      const { reply } = await chat({ data: { messages: next } });
-      setMessages([...next, { role: "assistant", content: reply || "..." }]);
+      // Safety net: never let the UI spin forever, even if something
+      // upstream hangs instead of returning an error.
+      const result = await Promise.race([
+        chat({ data: { messages: next } }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("محدش رد خلال 30 ثانية — جرب تاني")), 30_000),
+        ),
+      ]);
+      setMessages([...next, { role: "assistant", content: result.reply || "..." }]);
     } catch (e: any) {
       setError(e?.message ?? "حصل خطأ");
     } finally {
