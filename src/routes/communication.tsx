@@ -10,9 +10,7 @@ import {
   Mic,
   Video,
   Trash2,
-  ShieldOff,
   VolumeX,
-  UserPlus,
   Users,
   CalendarClock,
   Megaphone,
@@ -27,6 +25,8 @@ import {
   Hash,
   X,
   Trash,
+  Crown,
+  Ban,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -126,9 +126,46 @@ type MemberRow = {
   user_id: string;
   status: "active" | "banned";
   muted_until: string | null;
+  banned_until?: string | null;
   full_name?: string;
   level?: number;
 };
+
+// A member is actually muted right now if muted_until is in the future (or
+// the "مكتوم للأبد" sentinel, which Postgres stores as 'infinity').
+function isCurrentlyMuted(mutedUntil: string | null | undefined) {
+  if (!mutedUntil) return false;
+  if (mutedUntil === "infinity") return true;
+  return new Date(mutedUntil).getTime() > Date.now();
+}
+
+// Duration options shown before every mute/ban — "قد ايه؟" — null = forever.
+const DURATION_OPTIONS: { key: string; label: string; seconds: number | null }[] = [
+  { key: "1h", label: "ساعة", seconds: 60 * 60 },
+  { key: "6h", label: "6 ساعات", seconds: 6 * 60 * 60 },
+  { key: "1d", label: "يوم", seconds: 24 * 60 * 60 },
+  { key: "1w", label: "أسبوع", seconds: 7 * 24 * 60 * 60 },
+  { key: "1mo", label: "شهر", seconds: 30 * 24 * 60 * 60 },
+  { key: "1y", label: "سنة", seconds: 365 * 24 * 60 * 60 },
+  { key: "forever", label: "للأبد", seconds: null },
+];
+
+// Badge shown next to a member's name inside a specific group. Big Boss /
+// site admin are global; group role (admin/doctor/assistant) is per-group,
+// with the subject pulled straight from that group's `subject` field.
+function groupBadgeLabel(
+  info: { is_big_boss?: boolean; is_site_admin?: boolean; group_role?: string | null; display_title?: string | null } | undefined,
+  groupSubject?: string | null,
+): string | null {
+  if (!info) return null;
+  if (info.display_title?.trim()) return info.display_title.trim();
+  if (info.is_big_boss) return "Big Boss";
+  if (info.is_site_admin) return "أدمن الموقع";
+  if (info.group_role === "admin") return "أدمن الجروب";
+  if (info.group_role === "doctor") return groupSubject ? `د. ${groupSubject}` : "دكتور";
+  if (info.group_role === "assistant") return groupSubject ? `معيد ${groupSubject}` : "معيد";
+  return null;
+}
 
 const DAYS: { key: string; label: string }[] = [
   { key: "sat", label: "السبت" },
@@ -420,14 +457,18 @@ function CommunicationPage() {
   const { user, loading, roles, profile } = useAuth();
   const navigate = useNavigate();
   const isBigBoss = !!roles?.includes("super_admin");
-  const canCreateGroups = isBigBoss || !!roles?.includes("admin");
+  const isSiteAdmin = isBigBoss || !!roles?.includes("admin");
+  const canCreateGroups = isSiteAdmin;
   const myName = profile?.full_name || user?.email || "أنا";
 
   const [mode, setMode] = useState<"groups" | "dm">("groups");
 
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupRow | null>(null);
-  const [myLevel, setMyLevel] = useState(0); // 0 none · 1 member · 2 admin/doctor/assistant · 3 big boss
+  const [myLevel, setMyLevel] = useState(0); // 0 none · 1 member · 2 admin/doctor/assistant/site admin · 3 big boss
+  // My own membership row for the active group — the source of truth for
+  // whether *I* am muted/banned right now (fixes the old hardcoded `false`).
+  const [myMembership, setMyMembership] = useState<MemberRow | null>(null);
   const [busy, setBusy] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   // When set, the create-group dialog opens pre-scoped to add a sub-group
@@ -460,13 +501,26 @@ function CommunicationPage() {
   }, [user]);
 
   useEffect(() => {
-    if (!activeGroup || !user) return;
+    if (!activeGroup || !user) {
+      setMyMembership(null);
+      return;
+    }
     (async () => {
-      const { data } = await db.rpc("group_user_level", {
-        p_user_id: user.id,
-        p_group_id: activeGroup.id,
-      });
-      setMyLevel(typeof data === "number" ? data : 0);
+      // Opening a group registers you as an active member — unless you
+      // already have a row (e.g. you're banned; that must stick).
+      await db
+        .from("group_members")
+        .upsert(
+          { group_id: activeGroup.id, user_id: user.id, status: "active" },
+          { onConflict: "group_id,user_id", ignoreDuplicates: true },
+        );
+
+      const [{ data: levelData }, { data: memberRow }] = await Promise.all([
+        db.rpc("group_user_level", { p_user_id: user.id, p_group_id: activeGroup.id }),
+        db.from("group_members").select("*").eq("group_id", activeGroup.id).eq("user_id", user.id).maybeSingle(),
+      ]);
+      setMyLevel(typeof levelData === "number" ? levelData : 0);
+      setMyMembership((memberRow as MemberRow) ?? null);
     })();
   }, [activeGroup, user]);
 
@@ -647,6 +701,8 @@ function CommunicationPage() {
               userId={user.id}
               myName={myName}
               isBigBoss={isBigBoss}
+              isSiteAdmin={isSiteAdmin}
+              myMembership={myMembership}
               canCreateGroups={canCreateGroups}
               onSelectGroup={setActiveGroup}
               onAddSubgroup={(parentId) => {
@@ -864,6 +920,8 @@ function GroupPanel({
   userId,
   myName,
   isBigBoss: isGlobalBigBoss,
+  isSiteAdmin,
+  myMembership,
   canCreateGroups,
   onSelectGroup,
   onAddSubgroup,
@@ -875,6 +933,8 @@ function GroupPanel({
   userId: string;
   myName: string;
   isBigBoss: boolean;
+  isSiteAdmin: boolean;
+  myMembership: MemberRow | null;
   canCreateGroups: boolean;
   onSelectGroup: (g: GroupRow) => void;
   onAddSubgroup: (parentId: string) => void;
@@ -882,6 +942,10 @@ function GroupPanel({
 }) {
   const isAdmin = myLevel >= 2;
   const isBigBoss = myLevel >= 3;
+  // Big Boss is immune by definition — even if a stale membership row says
+  // otherwise, it can never actually apply to them.
+  const iAmMuted = !isBigBoss && isCurrentlyMuted(myMembership?.muted_until);
+  const iAmBanned = !isBigBoss && myMembership?.status === "banned";
 
   const parent = group.parent_group_id
     ? groups.find((g) => g.id === group.parent_group_id) ?? null
@@ -980,7 +1044,15 @@ function GroupPanel({
         </TabsList>
 
         <TabsContent value="chat">
-          <ChatView group={group} channel="general" userId={userId} myName={myName} isAdmin={isAdmin} muted={false} />
+          <ChatView
+            group={group}
+            channel="general"
+            userId={userId}
+            myName={myName}
+            isAdmin={isAdmin}
+            muted={iAmMuted}
+            banned={iAmBanned}
+          />
         </TabsContent>
         <TabsContent value="announcements">
           <ChatView
@@ -989,7 +1061,8 @@ function GroupPanel({
             userId={userId}
             myName={myName}
             isAdmin={isAdmin}
-            muted={false}
+            muted={iAmMuted}
+            banned={iAmBanned}
             readOnly={!isAdmin}
           />
         </TabsContent>
@@ -1007,7 +1080,13 @@ function GroupPanel({
         </TabsContent>
         {isAdmin && (
           <TabsContent value="members">
-            <MembersView groupId={group.id} isBigBoss={isBigBoss} actorId={userId} />
+            <MembersView
+              groupId={group.id}
+              groupSubject={group.subject}
+              isBigBoss={isBigBoss}
+              isSiteAdmin={isSiteAdmin}
+              actorId={userId}
+            />
           </TabsContent>
         )}
       </Tabs>
@@ -1086,6 +1165,7 @@ function ChatView({
   myName,
   isAdmin,
   muted,
+  banned = false,
   readOnly = false,
 }: {
   group: GroupRow;
@@ -1094,6 +1174,7 @@ function ChatView({
   myName: string;
   isAdmin: boolean;
   muted: boolean;
+  banned?: boolean;
   readOnly?: boolean;
 }) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -1180,6 +1261,8 @@ function ChatView({
 
   async function sendText() {
     if (!text.trim()) return;
+    if (banned) return toast.error("انت محظور من الجروب ده");
+    if (muted) return toast.error("انت متكتوم دلوقتي في الجروب ده");
     const body = text;
     setText("");
     const { error } = await db
@@ -1189,6 +1272,8 @@ function ChatView({
   }
 
   async function sendFile(file: File) {
+    if (banned) return toast.error("انت محظور من الجروب ده");
+    if (muted) return toast.error("انت متكتوم دلوقتي في الجروب ده");
     const type = file.type.startsWith("image")
       ? "image"
       : file.type.startsWith("video")
@@ -1389,11 +1474,13 @@ function ChatView({
         onPickFile={(f) => void sendFile(f)}
         onSendVoice={(blob) => void sendFile(blobToFile(blob))}
         uploading={uploading}
-        disabled={readOnly || muted}
+        disabled={readOnly || muted || banned}
         disabledMessage={
-          readOnly
-            ? "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
-            : "انت متكتوم دلوقتي في الجروب ده"
+          banned
+            ? "انت محظور من الجروب ده"
+            : muted
+              ? "انت متكتوم دلوقتي في الجروب ده"
+              : "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
         }
         typingNames={Object.values(typingUsers)}
       />
@@ -1607,110 +1694,306 @@ function ScheduleView({
 // ============================================================
 // Members + moderation
 // ============================================================
+type MemberBadgeInfo = {
+  full_name: string;
+  avatar_url?: string | null;
+  display_title?: string | null;
+  group_role?: "admin" | "doctor" | "assistant" | null;
+  is_big_boss: boolean;
+  is_site_admin: boolean;
+};
+
+// Mirrors public.can_moderate_in_group() so buttons only show up when the
+// action would actually succeed — the RPC is still the real gatekeeper.
+function canModerate(
+  actorId: string,
+  actorIsBigBoss: boolean,
+  actorIsSiteAdmin: boolean,
+  actorHasGroupRole: boolean,
+  target: MemberBadgeInfo & { user_id: string },
+) {
+  if (actorId === target.user_id) return false;
+  if (target.is_big_boss) return false;
+  if (actorIsBigBoss) return true;
+  if (actorIsSiteAdmin) return !target.is_site_admin;
+  if (target.is_site_admin) return false;
+  if (!actorHasGroupRole) return false;
+  return !target.group_role;
+}
+
+// Shared "قد ايه؟" duration picker used before every mute/ban.
+function DurationDialog({
+  open,
+  onOpenChange,
+  title,
+  confirmLabel,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  confirmLabel: string;
+  onConfirm: (seconds: number | null) => void;
+}) {
+  const [key, setKey] = useState("1h");
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Label className="text-xs text-foreground/70">لمدة قد ايه؟</Label>
+          <Select value={key} onValueChange={setKey}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DURATION_OPTIONS.map((o) => (
+                <SelectItem key={o.key} value={o.key}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            className="w-full"
+            variant="destructive"
+            onClick={() => {
+              const opt = DURATION_OPTIONS.find((o) => o.key === key);
+              onConfirm(opt ? opt.seconds : null);
+              onOpenChange(false);
+            }}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Site admins / Big Boss assign a group-level title to a member.
+function AssignRoleDialog({
+  open,
+  onOpenChange,
+  onAssign,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAssign: (role: "admin" | "doctor" | "assistant" | null) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>تعيين رتبة</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("admin"); onOpenChange(false); }}>
+            أدمن الجروب
+          </Button>
+          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("doctor"); onOpenChange(false); }}>
+            دكتور المادة
+          </Button>
+          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("assistant"); onOpenChange(false); }}>
+            معيد المادة
+          </Button>
+          <Button className="w-full justify-start text-destructive" variant="outline" onClick={() => { onAssign(null); onOpenChange(false); }}>
+            إزالة الرتبة
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MembersView({
   groupId,
+  groupSubject,
   isBigBoss,
+  isSiteAdmin,
   actorId,
 }: {
   groupId: string;
+  groupSubject?: string | null;
   isBigBoss: boolean;
+  isSiteAdmin: boolean;
   actorId: string;
 }) {
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [newAdminId, setNewAdminId] = useState("");
+  const [members, setMembers] = useState<(MemberRow & MemberBadgeInfo)[]>([]);
+  const [busy, setBusy] = useState(true);
+  const [moderationTarget, setModerationTarget] = useState<{ userId: string; action: "ban" | "mute" } | null>(null);
+  const [roleTarget, setRoleTarget] = useState<string | null>(null);
+
+  // Do I hold an admin/doctor/assistant role in *this* group?
+  const iHaveGroupRole = members.some((m) => m.user_id === actorId && !!m.group_role);
 
   async function load() {
+    setBusy(true);
+    await db.rpc("group_expire_moderation", { p_group_id: groupId }); // lift expired mutes/bans first
     const { data } = await db.from("group_members").select("*").eq("group_id", groupId);
     const rows = data ?? [];
-    // Resolve names through the get_profile_names() RPC instead of embedding
-    // `profiles` directly — a per-group doctor/assistant isn't necessarily a
-    // global `admin`, and the base RLS on `profiles` would hide other
-    // students' names from them if we queried the table straight.
     const ids = rows.map((r: any) => r.user_id);
-    const { data: names } = ids.length
-      ? await db.rpc("get_profile_names", { p_ids: ids })
+    const { data: badges } = ids.length
+      ? await db.rpc("get_member_badges", { p_group_id: groupId, p_ids: ids })
       : { data: [] };
-    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n.full_name]));
-    setMembers(rows.map((m: any) => ({ ...m, full_name: nameMap.get(m.user_id) ?? m.user_id })));
+    const badgeMap = new Map((badges ?? []).map((b: any) => [b.user_id, b]));
+    setMembers(
+      rows.map((m: any) => {
+        const b = badgeMap.get(m.user_id);
+        return {
+          ...m,
+          full_name: b?.full_name ?? m.user_id,
+          avatar_url: b?.avatar_url ?? null,
+          display_title: b?.display_title ?? null,
+          group_role: b?.group_role ?? null,
+          is_big_boss: !!b?.is_big_boss,
+          is_site_admin: !!b?.is_site_admin,
+        };
+      }),
+    );
+    setBusy(false);
   }
   useEffect(() => {
     void load();
   }, [groupId]);
 
-  async function ban(userId: string) {
-    await db.from("group_members").update({ status: "banned" }).eq("group_id", groupId).eq("user_id", userId);
-    await db.from("group_audit_log").insert({ group_id: groupId, actor_id: actorId, action: "ban", target_user_id: userId });
+  async function ban(userId: string, seconds: number | null) {
+    const { error } = await db.rpc("group_ban_member", { p_group_id: groupId, p_target: userId, p_seconds: seconds });
+    if (error) return toast.error(error.message);
+    toast.success("اتحظر");
     await load();
   }
 
   async function unban(userId: string) {
-    await db.from("group_members").update({ status: "active" }).eq("group_id", groupId).eq("user_id", userId);
+    const { error } = await db.rpc("group_unban_member", { p_group_id: groupId, p_target: userId });
+    if (error) return toast.error(error.message);
+    toast.success("اتفك الحظر");
     await load();
   }
 
-  async function mute(userId: string, minutes: number) {
-    const until = new Date(Date.now() + minutes * 60_000).toISOString();
-    await db.from("group_members").update({ muted_until: until }).eq("group_id", groupId).eq("user_id", userId);
-    await db.from("group_audit_log").insert({
-      group_id: groupId,
-      actor_id: actorId,
-      action: "mute",
-      target_user_id: userId,
-      details: { minutes },
-    });
+  async function mute(userId: string, seconds: number | null) {
+    const { error } = await db.rpc("group_mute_member", { p_group_id: groupId, p_target: userId, p_seconds: seconds });
+    if (error) return toast.error(error.message);
+    toast.success(seconds === null ? "اتكتم للأبد" : "اتكتم");
     await load();
-    toast.success(`اتكتم لمدة ${minutes} دقيقة`);
   }
 
-  async function promote(userId: string, role: "admin" | "doctor" | "assistant") {
-    if (!isBigBoss) return toast.error("البيج بوس بس اللي يقدر يعين رتب");
-    const { error } = await db
-      .from("group_role_assignments")
-      .upsert({ group_id: groupId, user_id: userId, role, assigned_by: actorId }, { onConflict: "group_id,user_id" });
-    if (error) toast.error(error.message);
-    else toast.success("اتعينت الرتبة");
+  async function unmute(userId: string) {
+    const { error } = await db.rpc("group_unmute_member", { p_group_id: groupId, p_target: userId });
+    if (error) return toast.error(error.message);
+    toast.success("اتفك الكتم");
+    await load();
   }
+
+  async function assignRole(userId: string, role: "admin" | "doctor" | "assistant" | null) {
+    const { error } = await db.rpc("group_assign_role", { p_group_id: groupId, p_target: userId, p_role: role });
+    if (error) return toast.error(error.message);
+    toast.success(role ? "اتعينت الرتبة" : "اتشالت الرتبة");
+    await load();
+  }
+
+  if (busy) return <Loader2 className="mx-auto h-5 w-5 animate-spin text-accent" />;
 
   return (
     <div className="space-y-1.5 py-2">
-      {members.map((m) => (
-        <div
-          key={m.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/40 bg-card/50 px-3 py-2 text-sm"
-        >
-          <span className="flex items-center gap-2">
-            <GroupAvatar name={m.full_name || "?"} size="sm" />
-            {m.full_name}
-            {m.status === "banned" && (
-              <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive">
-                محظور
-              </span>
-            )}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {m.status === "active" ? (
-              <button onClick={() => ban(m.user_id)} title="حظر" className="rounded-full bg-background/80 p-1.5">
-                <ShieldOff className="h-3.5 w-3.5 text-destructive" />
-              </button>
-            ) : (
-              <button onClick={() => unban(m.user_id)} title="فك الحظر" className="rounded-full bg-background/80 p-1.5 text-xs">
-                فك الحظر
-              </button>
-            )}
-            <button onClick={() => mute(m.user_id, 60)} title="كتم ساعة" className="rounded-full bg-background/80 p-1.5">
-              <VolumeX className="h-3.5 w-3.5" />
-            </button>
-            {isBigBoss && (
-              <button onClick={() => promote(m.user_id, "admin")} title="تعيين أدمن" className="rounded-full bg-background/80 p-1.5">
-                <UserPlus className="h-3.5 w-3.5 text-accent" />
-              </button>
-            )}
+      {members.map((m) => {
+        const iCanModerate = canModerate(actorId, isBigBoss, isSiteAdmin, iHaveGroupRole, m);
+        const canAssignRole = isSiteAdmin && m.user_id !== actorId && !m.is_big_boss;
+        const badge = groupBadgeLabel(m, groupSubject);
+        const muted = isCurrentlyMuted(m.muted_until);
+        return (
+          <div
+            key={m.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/40 bg-card/50 px-3 py-2 text-sm"
+          >
+            <Link
+              to="/profile/$userId"
+              params={{ userId: m.user_id }}
+              className="flex min-w-0 items-center gap-2 hover:opacity-80"
+            >
+              <GroupAvatar name={m.full_name || "?"} size="sm" />
+              <span className="min-w-0 truncate">{m.full_name}</span>
+              {badge && (
+                <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                  {badge}
+                </span>
+              )}
+              {m.status === "banned" && (
+                <span className="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive">
+                  محظور
+                </span>
+              )}
+              {muted && (
+                <span className="shrink-0 rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] text-foreground/60">
+                  مكتوم
+                </span>
+              )}
+            </Link>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {iCanModerate && (
+                <>
+                  {m.status === "active" ? (
+                    <button
+                      onClick={() => setModerationTarget({ userId: m.user_id, action: "ban" })}
+                      title="حظر"
+                      className="rounded-full bg-background/80 p-1.5"
+                    >
+                      <Ban className="h-3.5 w-3.5 text-destructive" />
+                    </button>
+                  ) : (
+                    <button onClick={() => unban(m.user_id)} title="فك الحظر" className="rounded-full bg-background/80 p-1.5 text-xs">
+                      فك الحظر
+                    </button>
+                  )}
+                  {muted ? (
+                    <button onClick={() => unmute(m.user_id)} title="فك الكتم" className="rounded-full bg-background/80 p-1.5 text-xs">
+                      فك الكتم
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setModerationTarget({ userId: m.user_id, action: "mute" })}
+                      title="كتم"
+                      className="rounded-full bg-background/80 p-1.5"
+                    >
+                      <VolumeX className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
+              )}
+              {canAssignRole && (
+                <button onClick={() => setRoleTarget(m.user_id)} title="تعيين رتبة" className="rounded-full bg-background/80 p-1.5">
+                  <Crown className="h-3.5 w-3.5 text-accent" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {members.length === 0 && (
         <p className="text-center text-sm text-foreground/60">مفيش أعضاء لسه</p>
       )}
+
+      <DurationDialog
+        open={!!moderationTarget}
+        onOpenChange={(open) => !open && setModerationTarget(null)}
+        title={moderationTarget?.action === "ban" ? "حظر العضو — لمدة قد ايه؟" : "كتم العضو — لمدة قد ايه؟"}
+        confirmLabel={moderationTarget?.action === "ban" ? "أكد الحظر" : "أكد الكتم"}
+        onConfirm={(seconds) => {
+          if (!moderationTarget) return;
+          if (moderationTarget.action === "ban") void ban(moderationTarget.userId, seconds);
+          else void mute(moderationTarget.userId, seconds);
+        }}
+      />
+      <AssignRoleDialog
+        open={!!roleTarget}
+        onOpenChange={(open) => !open && setRoleTarget(null)}
+        onAssign={(role) => {
+          if (!roleTarget) return;
+          void assignRole(roleTarget, role);
+        }}
+      />
     </div>
   );
 }
