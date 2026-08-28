@@ -284,6 +284,7 @@ function Composer({
   disabled,
   disabledMessage,
   typingNames,
+  mentionCandidates,
 }: {
   text: string;
   onTextChange: (v: string) => void;
@@ -294,6 +295,8 @@ function Composer({
   disabled?: boolean;
   disabledMessage?: string;
   typingNames?: string[];
+  // Discord-style "@" autocomplete — pass the group's members to enable it.
+  mentionCandidates?: { id: string; full_name: string }[];
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
@@ -349,6 +352,22 @@ function Composer({
 
   useEffect(() => () => stopStream(), []);
 
+  // "@" mention — triggers on an @ that starts the message or follows a
+  // space, matches against the group's member names (Discord-style).
+  const mentionMatch = mentionCandidates ? text.match(/(^|\s)@([^\s@]*)$/) : null;
+  const mentionQuery = mentionMatch ? mentionMatch[2] : null;
+  const mentionResults =
+    mentionQuery !== null && mentionCandidates
+      ? mentionCandidates
+          .filter((c) => c.full_name.toLowerCase().includes(mentionQuery.toLowerCase()))
+          .slice(0, 6)
+      : [];
+
+  function pickMention(name: string) {
+    const idx = text.lastIndexOf("@");
+    onTextChange(`${text.slice(0, idx)}@${name} `);
+  }
+
   if (disabled) {
     return (
       <p className="mt-3 rounded-full border border-border/60 bg-card/40 px-4 py-2.5 text-center text-xs text-foreground/60">
@@ -386,7 +405,21 @@ function Composer({
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 py-1 pl-1.5 pr-3 backdrop-blur">
+        <div className="relative flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 py-1 pl-1.5 pr-3 backdrop-blur">
+          {mentionResults.length > 0 && (
+            <div className="absolute bottom-full right-0 mb-1.5 w-56 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-soft">
+              {mentionResults.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => pickMention(c.full_name)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-right text-sm hover:bg-accent/15"
+                >
+                  <GroupAvatar name={c.full_name} size="sm" />
+                  <span className="truncate">{c.full_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -498,6 +531,7 @@ function CommunicationPage() {
     id: string;
     otherId: string;
     otherName: string;
+    otherAvatarUrl?: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -737,7 +771,14 @@ function CommunicationPage() {
           </div>
         ) : (
           <div className="cosmic-card rounded-3xl p-4 md:p-6">
-            <h2 className="mb-4 font-display text-xl">{activeConversation.otherName}</h2>
+            <Link
+              to="/profile/$userId"
+              params={{ userId: activeConversation.otherId }}
+              className="mb-4 flex items-center gap-2 hover:opacity-80"
+            >
+              <GroupAvatar name={activeConversation.otherName} size="sm" avatarUrl={activeConversation.otherAvatarUrl} />
+              <h2 className="font-display text-xl">{activeConversation.otherName}</h2>
+            </Link>
             <DMChatView conversationId={activeConversation.id} userId={user.id} />
           </div>
         )}
@@ -1428,10 +1469,38 @@ function ChatView({
     });
   }
 
-  const visibleMessages = messages.filter((m) => !hiddenIds.has(m.id));
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const visibleMessages = messages
+    .filter((m) => !hiddenIds.has(m.id))
+    .filter((m) => !searchQuery.trim() || (m.content ?? "").toLowerCase().includes(searchQuery.trim().toLowerCase()));
 
   return (
     <div className="flex h-[500px] flex-col">
+      <div className="mb-1.5 flex items-center justify-end">
+        <button
+          onClick={() => {
+            setSearchOpen((v) => !v);
+            if (searchOpen) setSearchQuery("");
+          }}
+          title="بحث في الشات"
+          className="rounded-full p-1.5 text-foreground/50 transition hover:bg-card/60 hover:text-foreground"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </div>
+      {searchOpen && (
+        <div className="relative mb-2">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
+          <Input
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="دور في رسايل الشات..."
+            className="pr-9"
+          />
+        </div>
+      )}
       <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
         {visibleMessages.map((m) => {
           const isSelf = m.sender_id === userId;
@@ -1563,6 +1632,7 @@ function ChatView({
               : "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
         }
         typingNames={Object.values(typingUsers)}
+        mentionCandidates={Array.from(senderBadges.entries()).map(([id, b]) => ({ id, full_name: b.full_name }))}
       />
 
       {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
@@ -2088,10 +2158,10 @@ function DMList({
 }: {
   userId: string;
   activeConversationId: string | null;
-  onOpen: (c: { id: string; otherId: string; otherName: string }) => void;
+  onOpen: (c: { id: string; otherId: string; otherName: string; otherAvatarUrl?: string | null }) => void;
 }) {
   const [conversations, setConversations] = useState<
-    { id: string; otherId: string; otherName: string }[]
+    { id: string; otherId: string; otherName: string; otherAvatarUrl: string | null }[]
   >([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -2108,11 +2178,20 @@ function DMList({
     const { data: names } = otherIds.length
       ? await db.rpc("get_profile_names", { p_ids: otherIds })
       : { data: [] };
-    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n.full_name]));
+    // Some deployments of get_profile_names only return {id, full_name}; read
+    // avatar_url opportunistically so this upgrades automatically once the
+    // RPC includes it, without breaking anything if it doesn't yet.
+    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n]));
     setConversations(
       rows.map((r: any) => {
         const otherId = r.user_a === userId ? r.user_b : r.user_a;
-        return { id: r.id, otherId, otherName: nameMap.get(otherId) ?? "مستخدم" };
+        const n = nameMap.get(otherId) as any;
+        return {
+          id: r.id,
+          otherId,
+          otherName: n?.full_name ?? "مستخدم",
+          otherAvatarUrl: n?.avatar_url ?? null,
+        };
       }),
     );
     setBusy(false);
@@ -2122,11 +2201,11 @@ function DMList({
     void load();
   }, [userId]);
 
-  async function startWith(otherId: string, otherName: string) {
+  async function startWith(otherId: string, otherName: string, otherAvatarUrl?: string | null) {
     const { data, error } = await db.rpc("get_or_create_dm", { p_other_user: otherId });
     if (error) return toast.error(error.message);
     setSearchOpen(false);
-    onOpen({ id: data as string, otherId, otherName });
+    onOpen({ id: data as string, otherId, otherName, otherAvatarUrl });
     await load();
   }
 
@@ -2162,7 +2241,7 @@ function DMList({
                 activeConversationId === c.id ? "bg-accent/15 text-accent" : "hover:bg-card/60"
               }`}
             >
-              <GroupAvatar name={c.otherName} size="sm" />
+              <GroupAvatar name={c.otherName} size="sm" avatarUrl={c.otherAvatarUrl} />
               <span className="truncate">{c.otherName}</span>
             </button>
           ))}
@@ -2172,9 +2251,13 @@ function DMList({
   );
 }
 
-function SearchUsers({ onPick }: { onPick: (id: string, name: string) => void }) {
+function SearchUsers({
+  onPick,
+}: {
+  onPick: (id: string, name: string, avatarUrl?: string | null) => void;
+}) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ id: string; full_name: string }[]>([]);
+  const [results, setResults] = useState<{ id: string; full_name: string; avatar_url?: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -2208,14 +2291,80 @@ function SearchUsers({ onPick }: { onPick: (id: string, name: string) => void })
         {results.map((r) => (
           <button
             key={r.id}
-            onClick={() => onPick(r.id, r.full_name)}
+            onClick={() => onPick(r.id, r.full_name, r.avatar_url)}
             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-right text-sm hover:bg-card/60"
           >
-            <GroupAvatar name={r.full_name} size="sm" />
+            <GroupAvatar name={r.full_name} size="sm" avatarUrl={r.avatar_url} />
             {r.full_name}
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function DmMediaView({ conversationId }: { conversationId: string }) {
+  const [items, setItems] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await db
+        .from("direct_messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .in("type", ["image", "video"])
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false });
+      setItems(data ?? []);
+    })();
+  }, [conversationId]);
+  if (items.length === 0) return <p className="py-8 text-center text-sm text-foreground/60">مفيش وسائط لسه</p>;
+  return (
+    <div className="grid grid-cols-3 gap-2 py-2">
+      {items.map((m) =>
+        m.type === "image" ? (
+          <img key={m.id} src={m.media_url!} className="aspect-square rounded-lg object-cover" />
+        ) : (
+          <video key={m.id} src={m.media_url!} className="aspect-square rounded-lg object-cover" />
+        ),
+      )}
+    </div>
+  );
+}
+
+function DmLinksView({ conversationId }: { conversationId: string }) {
+  const [links, setLinks] = useState<{ id: string; url: string }[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await db
+        .from("direct_messages")
+        .select("id, content")
+        .eq("conversation_id", conversationId)
+        .eq("type", "text")
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      const found: { id: string; url: string }[] = [];
+      for (const row of data ?? []) {
+        const matches = (row.content as string)?.match(URL_REGEX);
+        matches?.forEach((url) => found.push({ id: row.id, url }));
+      }
+      setLinks(found);
+    })();
+  }, [conversationId]);
+  if (links.length === 0) return <p className="py-8 text-center text-sm text-foreground/60">مفيش روابط اتبعتت لسه</p>;
+  return (
+    <div className="space-y-1.5 py-2">
+      {links.map((l, i) => (
+        <a
+          key={i}
+          href={l.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block truncate rounded-xl bg-card/60 px-3 py-2 text-sm text-accent hover:underline"
+        >
+          {l.url}
+        </a>
+      ))}
     </div>
   );
 }
@@ -2225,6 +2374,20 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // "Delete for me" — same per-device local hide used in group chat.
+  const hiddenKey = `hidden_dm_messages_${conversationId}`;
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(hiddenKey) || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [infoView, setInfoView] = useState<"media" | "links" | null>(null);
 
   async function load() {
     const { data } = await db
@@ -2253,6 +2416,25 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         (payload: any) => {
           setMessages((prev) => [...prev, payload.new]);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "direct_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload: any) => {
+          // Mirrors the group-chat fix: a "delete for everyone" flips
+          // is_deleted, and both sides should see it vanish immediately —
+          // no refresh needed.
+          if (payload.new.is_deleted) {
+            setMessages((prev) => prev.filter((m) => m.id !== payload.new.id));
+          } else {
+            setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)));
+          }
         },
       )
       .subscribe();
@@ -2298,69 +2480,172 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
     if (error) toast.error(error.message);
   }
 
+  // Each side can only ever manage their own messages in a DM — there's no
+  // "admin" here, so this mirrors the "regular member" rule from group chat.
+  async function deleteForEveryone(messageId: string) {
+    await db.from("direct_messages").update({ is_deleted: true }).eq("id", messageId);
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }
+
+  function deleteForMe(messageId: string) {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.add(messageId);
+      try {
+        localStorage.setItem(hiddenKey, JSON.stringify([...next]));
+      } catch {
+        /* ignore quota errors */
+      }
+      return next;
+    });
+  }
+
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const visibleMessages = messages
+    .filter((m) => !hiddenIds.has(m.id))
+    .filter((m) => !searchQuery.trim() || (m.content ?? "").toLowerCase().includes(searchQuery.trim().toLowerCase()));
 
   return (
     <div className="flex h-[500px] flex-col">
-      <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
-        {messages.map((m) => {
-          const isSelf = m.sender_id === userId;
-          const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
-          return (
-            <div key={m.id} className={`flex ${isSelf ? "justify-start" : "justify-end"}`}>
-              <div
-                className={
-                  isMedia
-                    ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
-                    : `max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
-                        isSelf
-                          ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
-                          : "rounded-bl-md border border-border/50 bg-card/70"
-                      }`
-                }
-              >
-                {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-                {m.type === "image" && m.media_url && (
-                  <div className="relative">
-                    <img
-                      src={m.media_url}
-                      onClick={() => setLightboxUrl(m.media_url!)}
-                      className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
-                    />
-                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                      {formatTime(m.created_at)}
-                    </span>
-                  </div>
-                )}
-                {m.type === "video" && m.media_url && (
-                  <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
-                )}
-                {m.type === "audio" && m.media_url && (
-                  <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
-                )}
-                {m.type === "file" && m.media_url && (
-                  <FileCard
-                    name={m.content || fileNameFromUrl(m.media_url)}
-                    url={m.media_url}
-                    size={m.media_size_bytes}
-                    tint={isSelf ? "self" : "other"}
+      <div className="mb-1.5 flex items-center justify-end gap-1">
+        <button
+          onClick={() => setInfoView(infoView === "media" ? null : "media")}
+          title="الوسائط"
+          className={`rounded-full p-1.5 transition hover:bg-card/60 hover:text-foreground ${
+            infoView === "media" ? "bg-card/60 text-accent" : "text-foreground/50"
+          }`}
+        >
+          <Images className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setInfoView(infoView === "links" ? null : "links")}
+          title="الروابط"
+          className={`rounded-full p-1.5 transition hover:bg-card/60 hover:text-foreground ${
+            infoView === "links" ? "bg-card/60 text-accent" : "text-foreground/50"
+          }`}
+        >
+          <Link2 className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => {
+            setSearchOpen((v) => !v);
+            if (searchOpen) setSearchQuery("");
+          }}
+          title="بحث في الشات"
+          className="rounded-full p-1.5 text-foreground/50 transition hover:bg-card/60 hover:text-foreground"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </div>
+      {searchOpen && (
+        <div className="relative mb-2">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
+          <Input
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="دور في رسايل الشات..."
+            className="pr-9"
+          />
+        </div>
+      )}
+      {infoView === "media" ? (
+        <div className="flex-1 overflow-y-auto">
+          <DmMediaView conversationId={conversationId} />
+        </div>
+      ) : infoView === "links" ? (
+        <div className="flex-1 overflow-y-auto">
+          <DmLinksView conversationId={conversationId} />
+        </div>
+      ) : (
+        <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
+          {visibleMessages.map((m) => {
+            const isSelf = m.sender_id === userId;
+            const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
+            const withinWindow = Date.now() - new Date(m.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
+            return (
+              <div key={m.id} className={`flex items-end gap-1 ${isSelf ? "justify-start" : "justify-end"}`}>
+                {isSelf && (
+                  <MessageActions
+                    message={m}
+                    isSelf={isSelf}
+                    isAdmin={false}
+                    canDeleteForEveryone={withinWindow}
+                    channel="general"
+                    onDeleteForMe={deleteForMe}
+                    onDeleteForEveryone={deleteForEveryone}
+                    onPin={() => {}}
+                    onAddToAnnouncements={() => {}}
                   />
                 )}
-                {!isMedia && (
-                  <span
-                    className={`mt-1 block text-left text-[10px] ${
-                      isSelf ? "text-primary-foreground/70" : "text-foreground/40"
-                    }`}
-                  >
-                    {formatTime(m.created_at)}
-                  </span>
+                <div
+                  className={
+                    isMedia
+                      ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
+                      : `max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                          isSelf
+                            ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
+                            : "rounded-bl-md border border-border/50 bg-card/70"
+                        }`
+                  }
+                >
+                  {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                  {m.type === "image" && m.media_url && (
+                    <div className="relative">
+                      <img
+                        src={m.media_url}
+                        onClick={() => setLightboxUrl(m.media_url!)}
+                        className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
+                      />
+                      <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                        {formatTime(m.created_at)}
+                      </span>
+                    </div>
+                  )}
+                  {m.type === "video" && m.media_url && (
+                    <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
+                  )}
+                  {m.type === "audio" && m.media_url && (
+                    <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
+                  )}
+                  {m.type === "file" && m.media_url && (
+                    <FileCard
+                      name={m.content || fileNameFromUrl(m.media_url)}
+                      url={m.media_url}
+                      size={m.media_size_bytes}
+                      tint={isSelf ? "self" : "other"}
+                    />
+                  )}
+                  {!isMedia && (
+                    <span
+                      className={`mt-1 block text-left text-[10px] ${
+                        isSelf ? "text-primary-foreground/70" : "text-foreground/40"
+                      }`}
+                    >
+                      {formatTime(m.created_at)}
+                    </span>
+                  )}
+                </div>
+                {!isSelf && (
+                  <MessageActions
+                    message={m}
+                    isSelf={isSelf}
+                    isAdmin={false}
+                    canDeleteForEveryone={false}
+                    channel="general"
+                    onDeleteForMe={deleteForMe}
+                    onDeleteForEveryone={deleteForEveryone}
+                    onPin={() => {}}
+                    onAddToAnnouncements={() => {}}
+                  />
                 )}
               </div>
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+      )}
       <Composer
         text={text}
         onTextChange={setText}
