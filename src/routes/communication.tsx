@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Loader2,
@@ -27,6 +27,7 @@ import {
   Trash,
   Crown,
   Ban,
+  Reply,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -138,6 +139,7 @@ type MessageRow = {
   is_deleted: boolean;
   created_at: string;
   sender_name?: string;
+  reply_to_id?: string | null;
 };
 
 type MemberRow = {
@@ -272,6 +274,134 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Discord-style short preview of a message for reply-quote UI — media
+// messages fall back to a friendly label since there's no text to show.
+function messagePreviewText(m: { type: string; content: string | null } | null | undefined) {
+  if (!m) return "رسالة محذوفة";
+  if (m.type === "text") return (m.content || "").slice(0, 120);
+  if (m.type === "image") return "📷 صورة";
+  if (m.type === "video") return "🎬 فيديو";
+  if (m.type === "audio") return "🎙️ رسالة صوتية";
+  if (m.type === "file") return `📎 ${m.content || "ملف"}`;
+  return m.content || "";
+}
+
+// Renders message text with "@Full Name" mentions highlighted in purple and
+// linked to that person's public profile — matches against known member
+// names so random "@" usage that isn't an actual mention stays plain text.
+function MessageContent({
+  content,
+  mentionCandidates,
+}: {
+  content: string;
+  mentionCandidates?: { id: string; full_name: string }[];
+}) {
+  if (!content) return null;
+  const candidates = (mentionCandidates ?? []).filter((c) => c.full_name?.trim());
+  if (candidates.length === 0) return <>{content}</>;
+
+  // Longest names first so "Ahmed Ali" wins over a shorter "Ahmed" candidate
+  // when both could match at the same position.
+  const sorted = [...candidates].sort((a, b) => b.full_name.length - a.full_name.length);
+  const pattern = sorted.map((c) => escapeRegExp(c.full_name)).join("|");
+  const regex = new RegExp(`@(${pattern})(?=\\s|$)`, "g");
+
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = regex.exec(content))) {
+    if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
+    const name = match[1];
+    const candidate = sorted.find((c) => c.full_name === name);
+    parts.push(
+      candidate ? (
+        <Link
+          key={`mention-${key++}`}
+          to="/profile/$userId"
+          params={{ userId: candidate.id }}
+          onClick={(e) => e.stopPropagation()}
+          className="font-semibold text-purple-400 hover:underline"
+        >
+          @{name}
+        </Link>
+      ) : (
+        `@${name}`
+      ),
+    );
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+  return <>{parts}</>;
+}
+
+// Discord-style "swipe the bubble to reply" gesture for touch devices —
+// wraps a message row and fires onReply once the drag passes a threshold.
+function SwipeToReply({
+  children,
+  onReply,
+  justify,
+}: {
+  children: ReactNode;
+  onReply: () => void;
+  justify: "start" | "end";
+}) {
+  const [dragX, setDragX] = useState(0);
+  const startX = useRef<number | null>(null);
+  const triggered = useRef(false);
+  const THRESHOLD = 52;
+  const MAX_DRAG = 84;
+
+  function handleStart(x: number) {
+    startX.current = x;
+    triggered.current = false;
+  }
+  function handleMove(x: number) {
+    if (startX.current === null) return;
+    const raw = x - startX.current;
+    const clamped = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, raw));
+    setDragX(clamped);
+    if (!triggered.current && Math.abs(clamped) >= THRESHOLD) {
+      triggered.current = true;
+      if (navigator.vibrate) navigator.vibrate(12);
+    }
+  }
+  function handleEnd() {
+    if (triggered.current) onReply();
+    setDragX(0);
+    startX.current = null;
+    triggered.current = false;
+  }
+
+  return (
+    <div
+      onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+      onTouchEnd={handleEnd}
+      onTouchCancel={handleEnd}
+      className={`relative flex w-full items-end gap-1 ${justify === "start" ? "justify-start" : "justify-end"}`}
+      style={{
+        transform: `translateX(${dragX}px)`,
+        transition: startX.current === null ? "transform 0.18s ease" : "none",
+      }}
+    >
+      {Math.abs(dragX) > 8 && (
+        <Reply
+          className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-accent ${
+            dragX > 0 ? "-right-6 scale-x-[-1]" : "-left-6"
+          }`}
+          style={{ opacity: Math.min(1, Math.abs(dragX) / THRESHOLD) }}
+        />
+      )}
+      {children}
+    </div>
+  );
+}
+
 // Shared composer bar used by both group chat and DMs — one pill-shaped
 // input instead of separate boxy controls.
 function Composer({
@@ -285,6 +415,8 @@ function Composer({
   disabledMessage,
   typingNames,
   mentionCandidates,
+  replyingTo,
+  onCancelReply,
 }: {
   text: string;
   onTextChange: (v: string) => void;
@@ -297,6 +429,9 @@ function Composer({
   typingNames?: string[];
   // Discord-style "@" autocomplete — pass the group's members to enable it.
   mentionCandidates?: { id: string; full_name: string }[];
+  // Discord-style "replying to ..." bar shown above the input.
+  replyingTo?: { senderName: string; preview: string } | null;
+  onCancelReply?: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
@@ -380,6 +515,21 @@ function Composer({
 
   return (
     <div className="mt-3">
+      {replyingTo && (
+        <div className="mb-1.5 flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-card/50 px-3 py-1.5">
+          <div className="min-w-0 flex-1 border-r-2 border-accent pr-2 text-right">
+            <p className="truncate text-xs font-semibold text-accent">{replyingTo.senderName}</p>
+            <p className="truncate text-xs text-foreground/60">{replyingTo.preview}</p>
+          </div>
+          <button
+            onClick={onCancelReply}
+            title="إلغاء الرد"
+            className="shrink-0 rounded-full p-1 text-foreground/50 transition hover:bg-background/60 hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {typingNames && typingNames.length > 0 && (
         <p className="mb-1 truncate px-2 text-[11px] text-foreground/50">{typingLabel(typingNames)}</p>
       )}
@@ -779,7 +929,13 @@ function CommunicationPage() {
               <GroupAvatar name={activeConversation.otherName} size="sm" avatarUrl={activeConversation.otherAvatarUrl} />
               <h2 className="font-display text-xl">{activeConversation.otherName}</h2>
             </Link>
-            <DMChatView conversationId={activeConversation.id} userId={user.id} />
+            <DMChatView
+              conversationId={activeConversation.id}
+              userId={user.id}
+              myName={myName}
+              otherId={activeConversation.otherId}
+              otherName={activeConversation.otherName}
+            />
           </div>
         )}
       </main>
@@ -1271,6 +1427,23 @@ function ChatView({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Discord-style reply: which message (if any) the composer is replying to,
+  // plus refs/highlight so tapping a quoted reply jumps to & flashes the
+  // original message.
+  const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const messagesById = new Map(messages.map((m) => [m.id, m]));
+
+  function scrollToMessage(id: string | null | undefined) {
+    if (!id) return;
+    const el = messageRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightId(id);
+    setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1500);
+  }
+
   // "Delete for me" is a per-device/local hide — no schema change needed.
   const hiddenKey = `hidden_messages_${group.id}_${channel}`;
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
@@ -1367,10 +1540,17 @@ function ChatView({
     if (banned) return toast.error("انت محظور من الجروب ده");
     if (muted) return toast.error("انت متكتوم دلوقتي في الجروب ده");
     const body = text;
+    const replyId = replyingTo?.id ?? null;
     setText("");
-    const { error } = await db
-      .from("group_messages")
-      .insert({ group_id: group.id, sender_id: userId, channel, type: "text", content: body });
+    setReplyingTo(null);
+    const { error } = await db.from("group_messages").insert({
+      group_id: group.id,
+      sender_id: userId,
+      channel,
+      type: "text",
+      content: body,
+      reply_to_id: replyId,
+    });
     if (error) toast.error(error.message);
   }
 
@@ -1415,6 +1595,8 @@ function ChatView({
     }
     const publicUrl = db.storage.from("group-media").getPublicUrl(path).data.publicUrl;
     setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    const replyId = replyingTo?.id ?? null;
+    setReplyingTo(null);
     const { error } = await db.from("group_messages").insert({
       group_id: group.id,
       sender_id: userId,
@@ -1423,6 +1605,7 @@ function ChatView({
       content: type === "file" ? file.name : null,
       media_url: publicUrl,
       media_size_bytes: file.size,
+      reply_to_id: replyId,
     });
     if (error) toast.error(error.message);
   }
@@ -1522,8 +1705,18 @@ function ChatView({
                 is_site_admin: !!senderBadge?.is_site_admin,
                 group_role: senderBadge?.group_role ?? null,
               });
+          const repliedMessage = m.reply_to_id ? messagesById.get(m.reply_to_id) : null;
+          const repliedSenderName = repliedMessage
+            ? repliedMessage.sender_id === userId
+              ? myName
+              : senderBadges.get(repliedMessage.sender_id)?.full_name || "حد"
+            : null;
+          const mentionCandidates = Array.from(senderBadges.entries()).map(([id, b]) => ({
+            id,
+            full_name: b.full_name,
+          }));
           return (
-            <div key={m.id} className={`flex items-end gap-1 ${isSelf ? "justify-start" : "justify-end"}`}>
+            <SwipeToReply key={m.id} onReply={() => setReplyingTo(m)} justify={isSelf ? "start" : "end"}>
               {isSelf && !isTemp && (
                 <MessageActions
                   message={m}
@@ -1537,18 +1730,47 @@ function ChatView({
                   onAddToAnnouncements={addToAnnouncements}
                 />
               )}
+              {!isTemp && (
+                <button
+                  onClick={() => setReplyingTo(m)}
+                  title="رد"
+                  className="shrink-0 self-center rounded-full p-1 text-foreground/35 transition hover:bg-card/60 hover:text-foreground"
+                >
+                  <Reply className="h-3.5 w-3.5" />
+                </button>
+              )}
               <div
+                ref={(el) => (messageRefs.current[m.id] = el)}
                 className={
                   isMedia
-                    ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
-                    : `relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
+                    ? `relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft transition ${
+                        highlightId === m.id ? "ring-2 ring-accent" : ""
+                      }`
+                    : `relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft transition ${
                         isSelf
                           ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
                           : "rounded-bl-md border border-border/50 bg-card/70"
-                      }`
+                      } ${highlightId === m.id ? "ring-2 ring-accent" : ""}`
                 }
               >
-                {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                {m.reply_to_id && (
+                  <button
+                    onClick={() => scrollToMessage(m.reply_to_id)}
+                    className={`mb-1.5 block w-full max-w-full truncate rounded-lg border-r-2 px-2 py-1 text-right text-[11px] transition hover:brightness-110 ${
+                      isSelf
+                        ? "border-primary-foreground/50 bg-black/10 text-primary-foreground/85"
+                        : "border-accent bg-accent/10 text-foreground/70"
+                    }`}
+                  >
+                    <span className="block truncate font-semibold">{repliedSenderName}</span>
+                    <span className="block truncate opacity-80">{messagePreviewText(repliedMessage)}</span>
+                  </button>
+                )}
+                {m.type === "text" && (
+                  <p className="whitespace-pre-wrap break-words">
+                    <MessageContent content={m.content ?? ""} mentionCandidates={mentionCandidates} />
+                  </p>
+                )}
 
                 {m.type === "image" && m.media_url && (
                   <div className="relative">
@@ -1607,7 +1829,7 @@ function ChatView({
                   onAddToAnnouncements={addToAnnouncements}
                 />
               )}
-            </div>
+            </SwipeToReply>
           );
         })}
         <div ref={bottomRef} />
@@ -1623,6 +1845,15 @@ function ChatView({
         onPickFile={(f) => void sendFile(f)}
         onSendVoice={(blob) => void sendFile(blobToFile(blob))}
         uploading={uploading}
+        replyingTo={
+          replyingTo
+            ? {
+                senderName: replyingTo.sender_id === userId ? myName : senderBadges.get(replyingTo.sender_id)?.full_name || "حد",
+                preview: messagePreviewText(replyingTo),
+              }
+            : null
+        }
+        onCancelReply={() => setReplyingTo(null)}
         disabled={readOnly || muted || banned}
         disabledMessage={
           banned
@@ -2369,11 +2600,42 @@ function DmLinksView({ conversationId }: { conversationId: string }) {
   );
 }
 
-function DMChatView({ conversationId, userId }: { conversationId: string; userId: string }) {
+function DMChatView({
+  conversationId,
+  userId,
+  myName,
+  otherId,
+  otherName,
+}: {
+  conversationId: string;
+  userId: string;
+  myName: string;
+  otherId: string;
+  otherName: string;
+}) {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Discord-style reply — same pattern as group chat's ChatView.
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const messagesById = new Map(messages.map((m: any) => [m.id, m]));
+  const mentionCandidates = [
+    { id: userId, full_name: myName },
+    { id: otherId, full_name: otherName },
+  ];
+
+  function scrollToMessage(id: string | null | undefined) {
+    if (!id) return;
+    const el = messageRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightId(id);
+    setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1500);
+  }
 
   // "Delete for me" — same per-device local hide used in group chat.
   const hiddenKey = `hidden_dm_messages_${conversationId}`;
@@ -2447,10 +2709,16 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
   async function sendText() {
     if (!text.trim()) return;
     const body = text;
+    const replyId = replyingTo?.id ?? null;
     setText("");
-    const { error } = await db
-      .from("direct_messages")
-      .insert({ conversation_id: conversationId, sender_id: userId, type: "text", content: body });
+    setReplyingTo(null);
+    const { error } = await db.from("direct_messages").insert({
+      conversation_id: conversationId,
+      sender_id: userId,
+      type: "text",
+      content: body,
+      reply_to_id: replyId,
+    });
     if (error) toast.error(error.message);
   }
 
@@ -2469,6 +2737,8 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
     if (upErr) return toast.error(upErr.message);
     // dm-media is a private bucket — build a signed URL instead of a public one
     const { data: signed } = await db.storage.from("dm-media").createSignedUrl(path, 60 * 60 * 24 * 7);
+    const replyId = replyingTo?.id ?? null;
+    setReplyingTo(null);
     const { error } = await db.from("direct_messages").insert({
       conversation_id: conversationId,
       sender_id: userId,
@@ -2476,6 +2746,7 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
       content: type === "file" ? file.name : null,
       media_url: signed?.signedUrl ?? null,
       media_size_bytes: file.size,
+      reply_to_id: replyId,
     });
     if (error) toast.error(error.message);
   }
@@ -2556,105 +2827,4 @@ function DMChatView({ conversationId, userId }: { conversationId: string; userId
         </div>
       ) : infoView === "links" ? (
         <div className="flex-1 overflow-y-auto">
-          <DmLinksView conversationId={conversationId} />
-        </div>
-      ) : (
-        <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
-          {visibleMessages.map((m) => {
-            const isSelf = m.sender_id === userId;
-            const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
-            const withinWindow = Date.now() - new Date(m.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
-            return (
-              <div key={m.id} className={`flex items-end gap-1 ${isSelf ? "justify-start" : "justify-end"}`}>
-                {isSelf && (
-                  <MessageActions
-                    message={m}
-                    isSelf={isSelf}
-                    isAdmin={false}
-                    canDeleteForEveryone={withinWindow}
-                    channel="general"
-                    onDeleteForMe={deleteForMe}
-                    onDeleteForEveryone={deleteForEveryone}
-                    onPin={() => {}}
-                    onAddToAnnouncements={() => {}}
-                  />
-                )}
-                <div
-                  className={
-                    isMedia
-                      ? "relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft"
-                      : `max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft ${
-                          isSelf
-                            ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
-                            : "rounded-bl-md border border-border/50 bg-card/70"
-                        }`
-                  }
-                >
-                  {m.type === "text" && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-                  {m.type === "image" && m.media_url && (
-                    <div className="relative">
-                      <img
-                        src={m.media_url}
-                        onClick={() => setLightboxUrl(m.media_url!)}
-                        className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
-                      />
-                      <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                        {formatTime(m.created_at)}
-                      </span>
-                    </div>
-                  )}
-                  {m.type === "video" && m.media_url && (
-                    <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
-                  )}
-                  {m.type === "audio" && m.media_url && (
-                    <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
-                  )}
-                  {m.type === "file" && m.media_url && (
-                    <FileCard
-                      name={m.content || fileNameFromUrl(m.media_url)}
-                      url={m.media_url}
-                      size={m.media_size_bytes}
-                      tint={isSelf ? "self" : "other"}
-                    />
-                  )}
-                  {!isMedia && (
-                    <span
-                      className={`mt-1 block text-left text-[10px] ${
-                        isSelf ? "text-primary-foreground/70" : "text-foreground/40"
-                      }`}
-                    >
-                      {formatTime(m.created_at)}
-                    </span>
-                  )}
-                </div>
-                {!isSelf && (
-                  <MessageActions
-                    message={m}
-                    isSelf={isSelf}
-                    isAdmin={false}
-                    canDeleteForEveryone={false}
-                    channel="general"
-                    onDeleteForMe={deleteForMe}
-                    onDeleteForEveryone={deleteForEveryone}
-                    onPin={() => {}}
-                    onAddToAnnouncements={() => {}}
-                  />
-                )}
-              </div>
-            );
-          })}
-          <div ref={bottomRef} />
-        </div>
-      )}
-      <Composer
-        text={text}
-        onTextChange={setText}
-        onSend={sendText}
-        onPickFile={(f) => void sendFile(f)}
-        onSendVoice={(blob) => void sendFile(blobToFile(blob))}
-        uploading={uploading}
-      />
-      {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
-    </div>
-  );
-}
+         
