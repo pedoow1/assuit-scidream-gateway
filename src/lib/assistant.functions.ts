@@ -128,7 +128,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 • خالد عماد — مقرر الأسرة`;
 
     const body = {
-      model: "mistral-large-latest",
+      model: "mistral-medium-latest",
       messages: [
         { role: "system", content: systemPrompt },
         ...data.messages.slice(-20),
