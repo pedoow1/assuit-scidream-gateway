@@ -115,7 +115,9 @@ function RootComponent() {
     let cancelled = false;
     const touch = async () => {
       const { data } = await supabase.auth.getUser();
-      if (!cancelled && data?.user) void (supabase as any).rpc("touch_presence");
+      if (cancelled || !data?.user) return;
+      const { error } = await (supabase as any).rpc("touch_presence");
+      if (error) console.error("[presence] touch_presence failed:", error.message);
     };
     void touch();
     const t = setInterval(touch, 60_000);
