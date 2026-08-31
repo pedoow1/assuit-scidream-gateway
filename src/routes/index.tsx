@@ -471,7 +471,7 @@ function LandingPage() {
           <div className="text-xs font-semibold uppercase tracking-widest text-accent text-center mb-4">قيادة الكلية</div>
           <div className="grid gap-5 max-w-md mx-auto">
             {[
-              { name: "أ.د فاطمة الزهراء عبدالحميد", role: "المشرفة الأكاديمية على الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260628-WA0034.jpg" },
+              { name: "أ.د فاطمة الزهراء عبدالحميد", role: "إشراف الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260628-WA0034.jpg" },
             ].map((p) => (
               <motion.div
                 key={p.name}
