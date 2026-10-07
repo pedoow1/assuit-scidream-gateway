@@ -168,7 +168,15 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
       const txt = await res.text();
       throw new Error(`GitHub Models error ${res.status}: ${txt.slice(0, 300)}`);
     }
-    const json: any = await res.json();
+    const raw = await res.text();
+    let json: any;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `رد GitHub مش JSON (status ${res.status}, type ${res.headers.get("content-type")}): ${raw.slice(0, 200)}`,
+      );
+    }
     const reply: string = json?.choices?.[0]?.message?.content ?? "";
     return { reply };
   });
