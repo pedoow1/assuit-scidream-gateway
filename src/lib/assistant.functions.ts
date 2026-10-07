@@ -13,8 +13,8 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
-    const key = process.env.MISTRAL_API_KEY;
-    if (!key) throw new Error("MISTRAL_API_KEY غير مضبوط على السيرفر");
+    const key = process.env.GITHUB_MODELS_TOKEN;
+    if (!key) throw new Error("GITHUB_MODELS_TOKEN غير مضبوط على السيرفر");
 
     const systemPrompt = `أنت "Kotb (قطب)"، مساعد ذكي لطلاب كلية العلوم جامعة أسيوط — منصة Dream Team.
 
@@ -128,7 +128,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 • خالد عماد — مقرر الأسرة`;
 
     const body = {
-      model: "ministral-14b-2512",
+      model: process.env.GITHUB_MODEL || "openai/gpt-4.1-mini",
       messages: [
         { role: "system", content: systemPrompt },
         ...data.messages.slice(-20),
@@ -138,16 +138,18 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 
     // Don't let a stuck/slow upstream call hang the request forever — cap it
     // at 25s so the client always gets *something* back instead of an
-    // endless spinner if Mistral is unreachable or slow.
+    // endless spinner if GitHub Models is unreachable or slow.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25_000);
 
     let res: Response;
     try {
-      res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      res = await fetch("https://models.github.ai/inference/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify(body),
@@ -164,7 +166,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`Mistral error ${res.status}: ${txt.slice(0, 300)}`);
+      throw new Error(`GitHub Models error ${res.status}: ${txt.slice(0, 300)}`);
     }
     const json: any = await res.json();
     const reply: string = json?.choices?.[0]?.message?.content ?? "";
