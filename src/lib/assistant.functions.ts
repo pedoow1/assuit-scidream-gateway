@@ -13,8 +13,11 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
-    const key = process.env.GITHUB_MODELS_TOKEN;
-    if (!key) throw new Error("GITHUB_MODELS_TOKEN غير مضبوط على السيرفر");
+    // Any OpenAI-compatible provider works: set AI_API_KEY (+ optionally AI_BASE_URL / AI_MODEL).
+    // Falls back to MISTRAL_API_KEY so the old setup keeps working.
+    const key = process.env.AI_API_KEY || process.env.MISTRAL_API_KEY;
+    if (!key) throw new Error("AI_API_KEY غير مضبوط على السيرفر");
+    const baseUrl = (process.env.AI_BASE_URL || "https://api.mistral.ai/v1").replace(/\/$/, "");
 
     const systemPrompt = `أنت "Kotb (قطب)"، مساعد ذكي لطلاب كلية العلوم جامعة أسيوط — منصة Dream Team.
 
@@ -128,7 +131,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 • خالد عماد — مقرر الأسرة`;
 
     const body = {
-      model: process.env.GITHUB_MODEL || "openai/gpt-4.1-mini",
+      model: process.env.AI_MODEL || "ministral-14b-2512",
       messages: [
         { role: "system", content: systemPrompt },
         ...data.messages.slice(-20),
@@ -138,18 +141,16 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 
     // Don't let a stuck/slow upstream call hang the request forever — cap it
     // at 25s so the client always gets *something* back instead of an
-    // endless spinner if GitHub Models is unreachable or slow.
+    // endless spinner if the AI provider is unreachable or slow.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25_000);
 
     let res: Response;
     try {
-      res = await fetch("https://models.github.ai/inference/chat/completions", {
+      res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify(body),
@@ -166,7 +167,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`GitHub Models error ${res.status}: ${txt.slice(0, 300)}`);
+      throw new Error(`AI provider error ${res.status}: ${txt.slice(0, 300)}`);
     }
     const raw = await res.text();
     let json: any;
@@ -174,7 +175,7 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
       json = JSON.parse(raw);
     } catch {
       throw new Error(
-        `رد GitHub مش JSON (status ${res.status}, type ${res.headers.get("content-type")}): ${raw.slice(0, 200)}`,
+        `رد المزوّد مش JSON (status ${res.status}, type ${res.headers.get("content-type")}): ${raw.slice(0, 200)}`,
       );
     }
     const reply: string = json?.choices?.[0]?.message?.content ?? "";
