@@ -61,6 +61,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { GroupPermissionsPanel } from "@/components/GroupPermissionsPanel";
 import { playMessageSound } from "@/lib/sounds";
 import type { AppNotification } from "@/hooks/use-notifications";
 
@@ -70,6 +71,21 @@ import type { AppNotification } from "@/hooks/use-notifications";
 // automatically after a migration is applied), we talk to these tables
 // through a loosely-typed client to avoid false compile errors.
 const db = supabase as any;
+
+// Readable messages for the permission errors raised by the database triggers.
+const PERMISSION_ERRORS: Record<string, string> = {
+  ACCOUNT_RESTRICTED: "حسابك متقيّد من الإدارة",
+  UPLOADS_DISABLED_GROUPS: "رفع الملفات في الجروبات مقفول حاليًا من الإدارة",
+  UPLOADS_DISABLED_DM: "رفع الملفات في الخاص مقفول حاليًا من الإدارة",
+  GROUP_UPLOADS_DISABLED: "رفع الملفات مقفول في الجروب ده",
+  RANK_CANNOT_SPEAK: "الكلام مقفول على رتبتك في الجروب ده",
+  RANK_CANNOT_UPLOAD: "رفع الملفات مقفول على رتبتك في الجروب ده",
+};
+function friendlyError(msg?: string | null) {
+  if (!msg) return "حصل خطأ";
+  for (const [k, v] of Object.entries(PERMISSION_ERRORS)) if (msg.includes(k)) return v;
+  return msg;
+}
 
 export const Route = createFileRoute("/communication")({
   head: () => ({ meta: [{ title: "التواصل — Assuit SciDream" }] }),
@@ -93,6 +109,7 @@ type GroupRow = {
   visibility?: "all" | "batch" | "people";
   visibility_batch_year?: number | null;
   is_closed?: boolean;
+  allow_uploads?: boolean;
   avatar_url?: string | null;
 };
 
@@ -500,6 +517,7 @@ function Composer({
   mentionCandidates,
   replyingTo,
   onCancelReply,
+  uploadDisabled = false,
 }: {
   text: string;
   onTextChange: (v: string) => void;
@@ -515,6 +533,8 @@ function Composer({
   // Discord-style "replying to ..." bar shown above the input.
   replyingTo?: { senderName: string; preview: string } | null;
   onCancelReply?: () => void;
+  // Attach button is greyed out when uploads are locked for this user.
+  uploadDisabled?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
@@ -666,8 +686,8 @@ function Composer({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            title="إرفاق صورة/فيديو/صوت/ملف"
+            disabled={uploading || uploadDisabled}
+            title={uploadDisabled ? "رفع الملفات مقفول" : "إرفاق صورة/فيديو/صوت/ملف"}
             className="shrink-0 rounded-full p-2 text-foreground/60 transition hover:bg-background/60 hover:text-foreground disabled:opacity-50"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
@@ -1432,6 +1452,18 @@ function GroupPanel({
   const children = groups.filter((g) => g.parent_group_id === group.id);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(false);
+  // 4 big boss, 3 site admin, 2 group admin, 0 everyone else
+  const [myPower, setMyPower] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    db.rpc("group_my_power", { p_group: group.id }).then(({ data }: any) => {
+      if (!cancelled) setMyPower(typeof data === "number" ? data : 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [group.id]);
 
   // Tabs are controlled so tapping a pinned message can jump straight to
   // "الشات" (or "الإعلانات", if that's where the message lives) and scroll
@@ -1468,7 +1500,7 @@ function GroupPanel({
           </div>
         </div>
 
-        {(canCreateGroups || isGlobalBigBoss || isSiteAdmin) && (
+        {(canCreateGroups || isGlobalBigBoss || isSiteAdmin || myPower >= 2) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="secondary" className="h-8 w-8 shrink-0 rounded-full">
@@ -1479,6 +1511,11 @@ function GroupPanel({
               {canCreateGroups && !parent && (
                 <DropdownMenuItem onClick={() => onAddSubgroup(group.id)}>
                   <Plus className="ml-2 h-3.5 w-3.5" /> إضافة جروب فرعي
+                </DropdownMenuItem>
+              )}
+              {myPower >= 2 && (
+                <DropdownMenuItem onClick={() => setPermsOpen(true)}>
+                  <Users className="ml-2 h-3.5 w-3.5" /> صلاحيات الجروب
                 </DropdownMenuItem>
               )}
               {isSiteAdmin && (
@@ -1513,6 +1550,17 @@ function GroupPanel({
                 setSettingsOpen(false);
               }}
             />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {myPower >= 2 && (
+        <Dialog open={permsOpen} onOpenChange={setPermsOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>صلاحيات جروب {group.name}</DialogTitle>
+            </DialogHeader>
+            <GroupPermissionsPanel group={group} myPower={myPower} onGroupUpdated={onGroupUpdated} />
           </DialogContent>
         </Dialog>
       )}
@@ -1725,6 +1773,25 @@ function ChatView({
   // "isAdmin can nuke anything" rule.
   const [senderBadges, setSenderBadges] = useState<Map<string, MemberBadgeInfo>>(new Map());
   const iHaveGroupRole = !!senderBadges.get(userId)?.group_role;
+
+  // What I'm allowed to do here (talk / upload) — mirrors the DB trigger.
+  const [sendState, setSendState] = useState<{
+    can_speak: boolean;
+    can_upload: boolean;
+    speak_reason?: string | null;
+    upload_reason?: string | null;
+  }>({ can_speak: true, can_upload: true });
+  async function refreshSendState() {
+    const { data } = await db.rpc("my_group_send_state", { p_group: group.id });
+    if (data) setSendState(data);
+    return data as typeof sendState | null;
+  }
+  useEffect(() => {
+    void refreshSendState();
+    const t = setInterval(() => void refreshSendState(), 30_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group.id]);
 
   useEffect(() => {
     (async () => {
@@ -2023,6 +2090,7 @@ function ChatView({
     if (!text.trim()) return;
     if (banned) return toast.error("انت محظور من الجروب ده");
     if (muted) return toast.error("انت متكتوم دلوقتي في الجروب ده");
+    if (!sendState.can_speak) return toast.error(friendlyError(sendState.speak_reason ?? "RANK_CANNOT_SPEAK"));
     const body = text;
     const replyId = replyingTo?.id ?? null;
     const mentionedIds = extractMentionedIds(
@@ -2040,12 +2108,20 @@ function ChatView({
       reply_to_id: replyId,
       mentioned_user_ids: mentionedIds,
     });
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(friendlyError(error.message));
+      setText(body);
+      void refreshSendState();
+    }
   }
 
   async function sendFile(file: File) {
     if (banned) return toast.error("انت محظور من الجروب ده");
     if (muted) return toast.error("انت متكتوم دلوقتي في الجروب ده");
+    // check BEFORE uploading so we never leave orphan files in storage
+    const st = await refreshSendState();
+    if (st && st.can_speak === false) return toast.error(friendlyError(st.speak_reason));
+    if (st && st.can_upload === false) return toast.error(friendlyError(st.upload_reason));
     const type = file.type.startsWith("image")
       ? "image"
       : file.type.startsWith("video")
@@ -2096,7 +2172,11 @@ function ChatView({
       media_size_bytes: file.size,
       reply_to_id: replyId,
     });
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(friendlyError(error.message));
+      await db.storage.from("group-media").remove([path]);
+      void refreshSendState();
+    }
   }
 
   async function pinMessage(messageId: string) {
@@ -2395,6 +2475,7 @@ function ChatView({
         onPickFile={(f) => void sendFile(f)}
         onSendVoice={(blob) => void sendFile(blobToFile(blob))}
         uploading={uploading}
+        uploadDisabled={!sendState.can_upload}
         replyingTo={
           replyingTo
             ? {
@@ -2404,13 +2485,15 @@ function ChatView({
             : null
         }
         onCancelReply={() => setReplyingTo(null)}
-        disabled={readOnly || muted || banned}
+        disabled={readOnly || muted || banned || !sendState.can_speak}
         disabledMessage={
           banned
             ? "انت محظور من الجروب ده"
             : muted
               ? "انت متكتوم دلوقتي في الجروب ده"
-              : "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
+              : !sendState.can_speak
+                ? friendlyError(sendState.speak_reason ?? "RANK_CANNOT_SPEAK")
+                : "القناة دي للإعلانات بس — الأدمنز/الدكاترة/المعيدين هما اللي يكتبوا فيها"
         }
         typingNames={Object.values(typingUsers)}
         mentionCandidates={Array.from(senderBadges.entries()).map(([id, b]) => ({ id, full_name: b.full_name }))}
@@ -2634,1637 +2717,6 @@ function ScheduleView({
       )}
 
       {isAdmin && (
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-border/60 p-3 sm:grid-cols-4">
-          <Input
-            placeholder="اسم المحاضرة"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <select
-            className="rounded-md border border-border bg-background px-2 text-sm"
-            value={form.day_of_week}
-            onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}
-          >
-            {DAYS.map((d) => (
-              <option key={d.key} value={d.key}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-          <Input
-            type="time"
-            value={form.start_time}
-            onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-          />
-          <Input
-            placeholder="المكان/اللينك"
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-          />
-          <Button className="col-span-2 sm:col-span-4" onClick={add}>
-            إضافة
-          </Button>
         </div>
-      )}
-    </div>
   );
-}
-
-// ============================================================
-// Members + moderation
-// ============================================================
-type MemberBadgeInfo = {
-  full_name: string;
-  avatar_url?: string | null;
-  display_title?: string | null;
-  group_role?: "admin" | "doctor" | "assistant" | null;
-  is_big_boss: boolean;
-  is_site_admin: boolean;
-};
-
-// Mirrors public.can_moderate_in_group() so buttons only show up when the
-// action would actually succeed — the RPC is still the real gatekeeper.
-function canModerate(
-  actorId: string,
-  actorIsBigBoss: boolean,
-  actorIsSiteAdmin: boolean,
-  actorHasGroupRole: boolean,
-  target: MemberBadgeInfo & { user_id: string },
-) {
-  if (actorId === target.user_id) return false;
-  if (target.is_big_boss) return false;
-  if (actorIsBigBoss) return true;
-  if (actorIsSiteAdmin) return !target.is_site_admin;
-  if (target.is_site_admin) return false;
-  if (!actorHasGroupRole) return false;
-  return !target.group_role;
-}
-
-// Shared "قد ايه؟" duration picker used before every mute/ban.
-function DurationDialog({
-  open,
-  onOpenChange,
-  title,
-  confirmLabel,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  confirmLabel: string;
-  onConfirm: (seconds: number | null) => void;
-}) {
-  const [key, setKey] = useState("1h");
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir="rtl">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Label className="text-xs text-foreground/70">لمدة قد ايه؟</Label>
-          <Select value={key} onValueChange={setKey}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DURATION_OPTIONS.map((o) => (
-                <SelectItem key={o.key} value={o.key}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            className="w-full"
-            variant="destructive"
-            onClick={() => {
-              const opt = DURATION_OPTIONS.find((o) => o.key === key);
-              onConfirm(opt ? opt.seconds : null);
-              onOpenChange(false);
-            }}
-          >
-            {confirmLabel}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Site admins / Big Boss assign a group-level title to a member.
-function AssignRoleDialog({
-  open,
-  onOpenChange,
-  onAssign,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onAssign: (role: "admin" | "doctor" | "assistant" | null) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir="rtl">
-        <DialogHeader>
-          <DialogTitle>تعيين رتبة</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("admin"); onOpenChange(false); }}>
-            أدمن الجروب
-          </Button>
-          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("doctor"); onOpenChange(false); }}>
-            دكتور المادة
-          </Button>
-          <Button className="w-full justify-start" variant="secondary" onClick={() => { onAssign("assistant"); onOpenChange(false); }}>
-            معيد المادة
-          </Button>
-          <Button className="w-full justify-start text-destructive" variant="outline" onClick={() => { onAssign(null); onOpenChange(false); }}>
-            إزالة الرتبة
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MembersView({
-  groupId,
-  groupSubject,
-  isBigBoss,
-  isSiteAdmin,
-  actorId,
-}: {
-  groupId: string;
-  groupSubject?: string | null;
-  isBigBoss: boolean;
-  isSiteAdmin: boolean;
-  actorId: string;
-}) {
-  const [members, setMembers] = useState<(MemberRow & MemberBadgeInfo)[]>([]);
-  const [busy, setBusy] = useState(true);
-  const [moderationTarget, setModerationTarget] = useState<{ userId: string; action: "ban" | "mute" } | null>(null);
-  const [roleTarget, setRoleTarget] = useState<string | null>(null);
-
-  // Do I hold an admin/doctor/assistant role in *this* group?
-  const iHaveGroupRole = members.some((m) => m.user_id === actorId && !!m.group_role);
-
-  async function load() {
-    setBusy(true);
-    await db.rpc("group_expire_moderation", { p_group_id: groupId }); // lift expired mutes/bans first
-    const { data } = await db.from("group_members").select("*").eq("group_id", groupId);
-    const rows = data ?? [];
-    const ids = rows.map((r: any) => r.user_id);
-    const { data: badges } = ids.length
-      ? await db.rpc("get_member_badges", { p_group_id: groupId, p_ids: ids })
-      : { data: [] };
-    const badgeMap = new Map((badges ?? []).map((b: any) => [b.user_id, b]));
-    setMembers(
-      rows.map((m: any) => {
-        const b = badgeMap.get(m.user_id);
-        return {
-          ...m,
-          full_name: b?.full_name ?? m.user_id,
-          avatar_url: b?.avatar_url ?? null,
-          display_title: b?.display_title ?? null,
-          group_role: b?.group_role ?? null,
-          is_big_boss: !!b?.is_big_boss,
-          is_site_admin: !!b?.is_site_admin,
-        };
-      }),
-    );
-    setBusy(false);
-  }
-  useEffect(() => {
-    void load();
-  }, [groupId]);
-
-  async function ban(userId: string, seconds: number | null) {
-    const { error } = await db.rpc("group_ban_member", { p_group_id: groupId, p_target: userId, p_seconds: seconds });
-    if (error) return toast.error(error.message);
-    toast.success("اتحظر");
-    await load();
-  }
-
-  async function unban(userId: string) {
-    const { error } = await db.rpc("group_unban_member", { p_group_id: groupId, p_target: userId });
-    if (error) return toast.error(error.message);
-    toast.success("اتفك الحظر");
-    await load();
-  }
-
-  async function mute(userId: string, seconds: number | null) {
-    const { error } = await db.rpc("group_mute_member", { p_group_id: groupId, p_target: userId, p_seconds: seconds });
-    if (error) return toast.error(error.message);
-    toast.success(seconds === null ? "اتكتم للأبد" : "اتكتم");
-    await load();
-  }
-
-  async function unmute(userId: string) {
-    const { error } = await db.rpc("group_unmute_member", { p_group_id: groupId, p_target: userId });
-    if (error) return toast.error(error.message);
-    toast.success("اتفك الكتم");
-    await load();
-  }
-
-  async function assignRole(userId: string, role: "admin" | "doctor" | "assistant" | null) {
-    const { error } = await db.rpc("group_assign_role", { p_group_id: groupId, p_target: userId, p_role: role });
-    if (error) return toast.error(error.message);
-    toast.success(role ? "اتعينت الرتبة" : "اتشالت الرتبة");
-    await load();
-  }
-
-  if (busy) return <Loader2 className="mx-auto h-5 w-5 animate-spin text-accent" />;
-
-  return (
-    <div className="space-y-1.5 py-2">
-      {members.map((m) => {
-        const iCanModerate = canModerate(actorId, isBigBoss, isSiteAdmin, iHaveGroupRole, m);
-        const canAssignRole = isSiteAdmin && m.user_id !== actorId && !m.is_big_boss;
-        const badge = groupBadgeLabel(m, groupSubject);
-        const muted = isCurrentlyMuted(m.muted_until);
-        return (
-          <div
-            key={m.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/40 bg-card/50 px-3 py-2 text-sm"
-          >
-            <Link
-              to="/profile/$userId"
-              params={{ userId: m.user_id }}
-              className="flex min-w-0 items-center gap-2 hover:opacity-80"
-            >
-              <GroupAvatar name={m.full_name || "?"} size="sm" avatarUrl={m.avatar_url} />
-              <span className="min-w-0 truncate">{m.full_name}</span>
-              {badge && (
-                <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
-                  {badge}
-                </span>
-              )}
-              {m.status === "banned" && (
-                <span className="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive">
-                  محظور
-                </span>
-              )}
-              {muted && (
-                <span className="shrink-0 rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] text-foreground/60">
-                  مكتوم
-                </span>
-              )}
-            </Link>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {iCanModerate && (
-                <>
-                  {m.status === "active" ? (
-                    <button
-                      onClick={() => setModerationTarget({ userId: m.user_id, action: "ban" })}
-                      title="حظر"
-                      className="rounded-full bg-background/80 p-1.5"
-                    >
-                      <Ban className="h-3.5 w-3.5 text-destructive" />
-                    </button>
-                  ) : (
-                    <button onClick={() => unban(m.user_id)} title="فك الحظر" className="rounded-full bg-background/80 p-1.5 text-xs">
-                      فك الحظر
-                    </button>
-                  )}
-                  {muted ? (
-                    <button onClick={() => unmute(m.user_id)} title="فك الكتم" className="rounded-full bg-background/80 p-1.5 text-xs">
-                      فك الكتم
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setModerationTarget({ userId: m.user_id, action: "mute" })}
-                      title="كتم"
-                      className="rounded-full bg-background/80 p-1.5"
-                    >
-                      <VolumeX className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </>
-              )}
-              {canAssignRole && (
-                <button onClick={() => setRoleTarget(m.user_id)} title="تعيين رتبة" className="rounded-full bg-background/80 p-1.5">
-                  <Crown className="h-3.5 w-3.5 text-accent" />
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {members.length === 0 && (
-        <p className="text-center text-sm text-foreground/60">مفيش أعضاء لسه</p>
-      )}
-
-      <DurationDialog
-        open={!!moderationTarget}
-        onOpenChange={(open) => !open && setModerationTarget(null)}
-        title={moderationTarget?.action === "ban" ? "حظر العضو — لمدة قد ايه؟" : "كتم العضو — لمدة قد ايه؟"}
-        confirmLabel={moderationTarget?.action === "ban" ? "أكد الحظر" : "أكد الكتم"}
-        onConfirm={(seconds) => {
-          if (!moderationTarget) return;
-          if (moderationTarget.action === "ban") void ban(moderationTarget.userId, seconds);
-          else void mute(moderationTarget.userId, seconds);
-        }}
-      />
-      <AssignRoleDialog
-        open={!!roleTarget}
-        onOpenChange={(open) => !open && setRoleTarget(null)}
-        onAssign={(role) => {
-          if (!roleTarget) return;
-          void assignRole(roleTarget, role);
-        }}
-      />
-    </div>
-  );
-}
-
-// ============================================================
-// Direct messages ("الخاص")
-// ============================================================
-function DMList({
-  userId,
-  activeConversationId,
-  onOpen,
-}: {
-  userId: string;
-  activeConversationId: string | null;
-  onOpen: (c: { id: string; otherId: string; otherName: string; otherAvatarUrl?: string | null }) => void;
-}) {
-  const [conversations, setConversations] = useState<
-    { id: string; otherId: string; otherName: string; otherAvatarUrl: string | null }[]
-  >([]);
-  const [friends, setFriends] = useState<{ id: string; full_name: string; avatar_url: string | null }[]>([]);
-  const [online, setOnline] = useState<Set<string>>(new Set());
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [busy, setBusy] = useState(true);
-  const [tab, setTab] = useState<"friends" | "external">("friends");
-  const [query, setQuery] = useState("");
-
-  async function load() {
-    setBusy(true);
-    const [{ data: convRows }, { data: friendRows, error: friendsError }] = await Promise.all([
-      db
-        .from("direct_conversations")
-        .select("*")
-        .or(`user_a.eq.${userId},user_b.eq.${userId}`)
-        .order("created_at", { ascending: false }),
-      db.rpc("list_friends"),
-    ]);
-    if (friendsError) console.error("[presence] list_friends failed:", friendsError.message);
-    const rows = convRows ?? [];
-    const otherIds = rows.map((r: any) => (r.user_a === userId ? r.user_b : r.user_a));
-    const { data: names } = otherIds.length
-      ? await db.rpc("get_profile_names", { p_ids: otherIds })
-      : { data: [] };
-    const nameMap = new Map((names ?? []).map((n: any) => [n.id, n]));
-    setConversations(
-      rows.map((r: any) => {
-        const otherId = r.user_a === userId ? r.user_b : r.user_a;
-        const n = nameMap.get(otherId) as any;
-        return {
-          id: r.id,
-          otherId,
-          otherName: n?.full_name ?? "مستخدم",
-          otherAvatarUrl: n?.avatar_url ?? null,
-        };
-      }),
-    );
-    const friendList = (friendRows ?? []).map((f: any) => ({
-      id: f.user_id,
-      full_name: f.full_name,
-      avatar_url: f.avatar_url ?? null,
-    }));
-    setFriends(friendList);
-    if (friendList.length) {
-      const { data: presence, error: presenceError } = await db.rpc("get_presence", {
-        p_ids: friendList.map((f: any) => f.id),
-      });
-      if (presenceError) console.error("[presence] get_presence failed:", presenceError.message);
-      setOnline(new Set((presence ?? []).filter((p: any) => p.is_online).map((p: any) => p.id)));
-    } else {
-      setOnline(new Set());
-    }
-    setBusy(false);
-  }
-
-  useEffect(() => {
-    void load();
-    const t = setInterval(load, 60_000); // keeps "Active now" fresh while the tab sits open
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  async function startWith(otherId: string, otherName: string, otherAvatarUrl?: string | null) {
-    const { data, error } = await db.rpc("get_or_create_dm", { p_other_user: otherId });
-    if (error) {
-      if (String(error.message).includes("dm_blocked_privacy")) {
-        return toast.error("الشخص ده بيسمح بالرسايل من أصحابه بس");
-      }
-      return toast.error(error.message);
-    }
-    setSearchOpen(false);
-    onOpen({ id: data as string, otherId, otherName, otherAvatarUrl });
-    await load();
-  }
-
-  const friendIds = new Set(friends.map((f) => f.id));
-  const q = query.trim().toLowerCase();
-
-  const friendConversations = conversations.filter((c) => friendIds.has(c.otherId));
-  const externalConversations = conversations.filter((c) => !friendIds.has(c.otherId));
-  const friendsWithoutConvo = friends.filter((f) => !conversations.some((c) => c.otherId === f.id));
-
-  const visibleFriendConvos = q ? friendConversations.filter((c) => c.otherName.toLowerCase().includes(q)) : friendConversations;
-  const visibleFriendsOnly = q ? friendsWithoutConvo.filter((f) => f.full_name.toLowerCase().includes(q)) : friendsWithoutConvo;
-  const visibleExternal = q ? externalConversations.filter((c) => c.otherName.toLowerCase().includes(q)) : externalConversations;
-  const activeNow = friends.filter((f) => online.has(f.id));
-
-  return (
-    <>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-display text-base">الخاص</h2>
-        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-          <DialogTrigger asChild>
-            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle>ابدأ محادثة جديدة</DialogTitle>
-            </DialogHeader>
-            <SearchUsers onPick={startWith} />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="relative mb-2.5">
-        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="دور في أصحابك..."
-          className="pr-9"
-        />
-      </div>
-
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "friends" | "external")} dir="rtl">
-        <TabsList className="mb-2.5 grid w-full grid-cols-2">
-          <TabsTrigger value="friends" className="text-xs">
-            الأصدقاء
-          </TabsTrigger>
-          <TabsTrigger value="external" className="relative text-xs">
-            رسايل خارجية
-            {externalConversations.length > 0 && (
-              <span className="mr-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent/20 px-1 text-[9px] text-accent">
-                {externalConversations.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        {busy ? (
-          <Loader2 className="h-5 w-5 animate-spin text-accent" />
-        ) : (
-          <>
-            <TabsContent value="friends" className="m-0 space-y-3">
-              {activeNow.length > 0 && !q && (
-                <div>
-                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] text-foreground/50">
-                    <Circle className="h-2 w-2 fill-emerald-400 text-emerald-400" /> متصل الآن
-                  </p>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {activeNow.map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => {
-                          const existing = friendConversations.find((c) => c.otherId === f.id);
-                          if (existing) onOpen(existing);
-                          else void startWith(f.id, f.full_name, f.avatar_url);
-                        }}
-                        className="flex shrink-0 flex-col items-center gap-1"
-                        title={f.full_name}
-                      >
-                        <span className="relative">
-                          <GroupAvatar name={f.full_name} size="sm" avatarUrl={f.avatar_url} />
-                          <span className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400" />
-                        </span>
-                        <span className="max-w-[52px] truncate text-[10px] text-foreground/60">{f.full_name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {visibleFriendConvos.length === 0 && visibleFriendsOnly.length === 0 ? (
-                <p className="text-xs text-foreground/60">مفيش محادثات مع أصحابك لسه</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {visibleFriendConvos.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => onOpen(c)}
-                      className={`flex w-full items-center gap-2 truncate rounded-xl px-2.5 py-2 text-right text-sm transition ${
-                        activeConversationId === c.id ? "bg-accent/15 text-accent" : "hover:bg-card/60"
-                      }`}
-                    >
-                      <span className="relative">
-                        <GroupAvatar name={c.otherName} size="sm" avatarUrl={c.otherAvatarUrl} />
-                        <span
-                          className={`absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${
-                            online.has(c.otherId) ? "bg-emerald-400" : "bg-foreground/30"
-                          }`}
-                        />
-                      </span>
-                      <span className="flex min-w-0 flex-col items-start truncate">
-                        <span className="truncate">{c.otherName}</span>
-                        <span className={`text-[10px] ${online.has(c.otherId) ? "text-emerald-400" : "text-foreground/40"}`}>
-                          {online.has(c.otherId) ? "متصل الآن" : "غير متصل"}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                  {visibleFriendsOnly.map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => void startWith(f.id, f.full_name, f.avatar_url)}
-                      className="flex w-full items-center gap-2 truncate rounded-xl px-2.5 py-2 text-right text-sm text-foreground/70 transition hover:bg-card/60"
-                    >
-                      <span className="relative">
-                        <GroupAvatar name={f.full_name} size="sm" avatarUrl={f.avatar_url} />
-                        <span
-                          className={`absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${
-                            online.has(f.id) ? "bg-emerald-400" : "bg-foreground/30"
-                          }`}
-                        />
-                      </span>
-                      <span className="flex min-w-0 flex-col items-start truncate">
-                        <span className="truncate">{f.full_name}</span>
-                        <span className={`text-[10px] ${online.has(f.id) ? "text-emerald-400" : "text-foreground/40"}`}>
-                          {online.has(f.id) ? "متصل الآن" : "غير متصل"}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="external" className="m-0 space-y-1.5">
-              {visibleExternal.length === 0 ? (
-                <p className="text-xs text-foreground/60">مفيش رسايل من برا الأصدقاء</p>
-              ) : (
-                visibleExternal.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => onOpen(c)}
-                    className={`flex w-full items-center gap-2 truncate rounded-xl px-2.5 py-2 text-right text-sm transition ${
-                      activeConversationId === c.id ? "bg-accent/15 text-accent" : "hover:bg-card/60"
-                    }`}
-                  >
-                    <GroupAvatar name={c.otherName} size="sm" avatarUrl={c.otherAvatarUrl} />
-                    <span className="truncate">{c.otherName}</span>
-                  </button>
-                ))
-              )}
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </>
-  );
-}
-
-function SearchUsers({
-  onPick,
-}: {
-  onPick: (id: string, name: string, avatarUrl?: string | null) => void;
-}) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ id: string; full_name: string; avatar_url?: string | null }[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setBusy(true);
-      const { data, error } = await db.rpc("search_profiles", { p_query: q.trim() });
-      if (error) toast.error(error.message);
-      setResults((data as any[]) ?? []);
-      setBusy(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  return (
-    <div className="space-y-2">
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="دور بالاسم..."
-          className="pr-9"
-        />
-      </div>
-      {busy && <Loader2 className="h-4 w-4 animate-spin text-accent" />}
-      <div className="max-h-60 space-y-1 overflow-y-auto">
-        {results.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => onPick(r.id, r.full_name, r.avatar_url)}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-right text-sm hover:bg-card/60"
-          >
-            <GroupAvatar name={r.full_name} size="sm" avatarUrl={r.avatar_url} />
-            {r.full_name}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DmMediaView({ conversationId }: { conversationId: string }) {
-  const [items, setItems] = useState<any[]>([]);
-  useEffect(() => {
-    (async () => {
-      const { data } = await db
-        .from("direct_messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .in("type", ["image", "video"])
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false });
-      setItems(data ?? []);
-    })();
-  }, [conversationId]);
-  if (items.length === 0) return <p className="py-8 text-center text-sm text-foreground/60">مفيش وسائط لسه</p>;
-  return (
-    <div className="grid grid-cols-3 gap-2 py-2">
-      {items.map((m) =>
-        m.type === "image" ? (
-          <img key={m.id} src={m.media_url!} className="aspect-square rounded-lg object-cover" />
-        ) : (
-          <video key={m.id} src={m.media_url!} className="aspect-square rounded-lg object-cover" />
-        ),
-      )}
-    </div>
-  );
-}
-
-function DmLinksView({ conversationId }: { conversationId: string }) {
-  const [links, setLinks] = useState<{ id: string; url: string }[]>([]);
-  useEffect(() => {
-    (async () => {
-      const { data } = await db
-        .from("direct_messages")
-        .select("id, content")
-        .eq("conversation_id", conversationId)
-        .eq("type", "text")
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(300);
-      const found: { id: string; url: string }[] = [];
-      for (const row of data ?? []) {
-        const matches = (row.content as string)?.match(URL_REGEX);
-        matches?.forEach((url) => found.push({ id: row.id, url }));
-      }
-      setLinks(found);
-    })();
-  }, [conversationId]);
-  if (links.length === 0) return <p className="py-8 text-center text-sm text-foreground/60">مفيش روابط اتبعتت لسه</p>;
-  return (
-    <div className="space-y-1.5 py-2">
-      {links.map((l, i) => (
-        <a
-          key={i}
-          href={l.url}
-          target="_blank"
-          rel="noreferrer"
-          className="block truncate rounded-xl bg-card/60 px-3 py-2 text-sm text-accent hover:underline"
-        >
-          {l.url}
-        </a>
-      ))}
-    </div>
-  );
-}
-
-function DMChatView({
-  conversationId,
-  userId,
-  myName,
-  otherId,
-  otherName,
-  onJoinedGroup,
-}: {
-  conversationId: string;
-  userId: string;
-  myName: string;
-  otherId: string;
-  otherName: string;
-  // Called after successfully redeeming a group-invite card in this DM, so
-  // the parent page can switch over to "الجروبات" and open it.
-  onJoinedGroup: (groupId: string) => void;
-}) {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [text, setText] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [forwardMessage, setForwardMessage] = useState<any | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Discord-style reply — same pattern as group chat's ChatView.
-  const [replyingTo, setReplyingTo] = useState<any | null>(null);
-  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  const messagesById = new Map(messages.map((m: any) => [m.id, m]));
-  const mentionCandidates = [
-    { id: userId, full_name: myName },
-    { id: otherId, full_name: otherName },
-  ];
-
-  function scrollToMessage(id: string | null | undefined) {
-    if (!id) return;
-    const el = messageRefs.current[id];
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    setHighlightId(id);
-    setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1500);
-  }
-
-  // "Delete for me" — same per-device local hide used in group chat.
-  const hiddenKey = `hidden_dm_messages_${conversationId}`;
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem(hiddenKey) || "[]"));
-    } catch {
-      return new Set();
-    }
-  });
-
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [infoView, setInfoView] = useState<"media" | "links" | null>(null);
-
-  async function load() {
-    const { data } = await db
-      .from("direct_messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: true })
-      .limit(200);
-    setMessages(data ?? []);
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-  }
-
-  useEffect(() => {
-    void load();
-    const ch = db
-      .channel(`dm-${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "direct_messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload: any) => {
-          setMessages((prev) => [...prev, payload.new]);
-          if (payload.new.sender_id !== userId) playMessageSound();
-          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "direct_messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload: any) => {
-          // Mirrors the group-chat fix: a "delete for everyone" flips
-          // is_deleted, and both sides should see it vanish immediately —
-          // no refresh needed.
-          if (payload.new.is_deleted) {
-            setMessages((prev) => prev.filter((m) => m.id !== payload.new.id));
-          } else {
-            setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)));
           }
-        },
-      )
-      .subscribe();
-    return () => {
-      db.removeChannel(ch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId]);
-
-  async function sendText() {
-    if (!text.trim()) return;
-    const body = text;
-    const replyId = replyingTo?.id ?? null;
-    setText("");
-    setReplyingTo(null);
-    const { error } = await db.from("direct_messages").insert({
-      conversation_id: conversationId,
-      sender_id: userId,
-      type: "text",
-      content: body,
-      reply_to_id: replyId,
-    });
-    if (error) toast.error(error.message);
-  }
-
-  async function sendFile(file: File) {
-    const type = file.type.startsWith("image")
-      ? "image"
-      : file.type.startsWith("video")
-        ? "video"
-        : file.type.startsWith("audio")
-          ? "audio"
-          : "file";
-    setUploading(true);
-    const path = `${conversationId}/${Date.now()}-${file.name}`;
-    const { error: upErr } = await db.storage.from("dm-media").upload(path, file);
-    setUploading(false);
-    if (upErr) return toast.error(upErr.message);
-    // dm-media is a private bucket — build a signed URL instead of a public one
-    const { data: signed } = await db.storage.from("dm-media").createSignedUrl(path, 60 * 60 * 24 * 7);
-    const replyId = replyingTo?.id ?? null;
-    setReplyingTo(null);
-    const { error } = await db.from("direct_messages").insert({
-      conversation_id: conversationId,
-      sender_id: userId,
-      type,
-      content: type === "file" ? file.name : null,
-      media_url: signed?.signedUrl ?? null,
-      media_size_bytes: file.size,
-      reply_to_id: replyId,
-    });
-    if (error) toast.error(error.message);
-  }
-
-  // Each side can only ever manage their own messages in a DM — there's no
-  // "admin" here, so this mirrors the "regular member" rule from group chat.
-  async function deleteForEveryone(messageId: string) {
-    await db.from("direct_messages").update({ is_deleted: true }).eq("id", messageId);
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
-  }
-
-  function deleteForMe(messageId: string) {
-    setHiddenIds((prev) => {
-      const next = new Set(prev);
-      next.add(messageId);
-      try {
-        localStorage.setItem(hiddenKey, JSON.stringify([...next]));
-      } catch {
-        /* ignore quota errors */
-      }
-      return next;
-    });
-  }
-
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-
-  const visibleMessages = messages
-    .filter((m) => !hiddenIds.has(m.id))
-    .filter((m) => !searchQuery.trim() || (m.content ?? "").toLowerCase().includes(searchQuery.trim().toLowerCase()));
-
-  return (
-    <div className="flex h-[500px] flex-col">
-      <div className="mb-1.5 flex items-center justify-between gap-1">
-        {infoView ? (
-          <>
-            <button
-              onClick={() => setInfoView(null)}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-foreground/70 transition hover:bg-card/60 hover:text-foreground"
-            >
-              <ArrowRight className="h-4 w-4" /> رجوع للشات
-            </button>
-            <span className="text-xs font-semibold text-foreground/50">
-              {infoView === "media" ? "الوسائط" : "الروابط"}
-            </span>
-          </>
-        ) : (
-          <div className="flex w-full items-center justify-end gap-1">
-            <button
-              onClick={() => setInfoView(infoView === "media" ? null : "media")}
-              title="الوسائط"
-              className={`rounded-full p-1.5 transition hover:bg-card/60 hover:text-foreground ${
-                infoView === "media" ? "bg-card/60 text-accent" : "text-foreground/50"
-              }`}
-            >
-              <Images className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setInfoView(infoView === "links" ? null : "links")}
-              title="الروابط"
-              className={`rounded-full p-1.5 transition hover:bg-card/60 hover:text-foreground ${
-                infoView === "links" ? "bg-card/60 text-accent" : "text-foreground/50"
-              }`}
-            >
-              <Link2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => {
-                setSearchOpen((v) => !v);
-                if (searchOpen) setSearchQuery("");
-              }}
-              title="بحث في الشات"
-              className="rounded-full p-1.5 text-foreground/50 transition hover:bg-card/60 hover:text-foreground"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-      </div>
-      {searchOpen && (
-        <div className="relative mb-2">
-          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
-          <Input
-            autoFocus
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="دور في رسايل الشات..."
-            className="pr-9"
-          />
-        </div>
-      )}
-      {infoView === "media" ? (
-        <div className="flex-1 overflow-y-auto">
-          <DmMediaView conversationId={conversationId} />
-        </div>
-      ) : infoView === "links" ? (
-        <div className="flex-1 overflow-y-auto">
-          <DmLinksView conversationId={conversationId} />
-        </div>
-      ) : (
-        <div className="flex-1 space-y-2.5 overflow-y-auto py-1 pr-1">
-          {visibleMessages.map((m) => {
-            const isSelf = m.sender_id === userId;
-            const isMedia = (m.type === "image" || m.type === "video") && !!m.media_url;
-            const isTemp = String(m.id).startsWith("temp-");
-            const withinWindow = Date.now() - new Date(m.created_at).getTime() < DELETE_FOR_EVERYONE_WINDOW_MS;
-            // A DM has no admin hierarchy — you can only ever nuke your own
-            // recent message for everyone; the other side's message can only
-            // ever be hidden locally ("delete for me").
-            const canDeleteForEveryone = isSelf && withinWindow;
-            const invite = m.type === "text" ? parseGroupInvite(m.content) : null;
-            const repliedMessage = m.reply_to_id ? messagesById.get(m.reply_to_id) : null;
-            const repliedSenderName = repliedMessage
-              ? repliedMessage.sender_id === userId
-                ? myName
-                : otherName
-              : null;
-            const actions = !isTemp && (
-              <DropdownMenu key={`actions-${m.id}`}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    title="خيارات الرسالة"
-                    className="shrink-0 self-center rounded-full p-1 text-foreground/35 transition hover:bg-card/60 hover:text-foreground"
-                  >
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" dir="rtl">
-                  <DropdownMenuItem onClick={() => setForwardMessage(m)}>
-                    <Reply className="ml-2 h-3.5 w-3.5 -scale-x-100" /> توجيه
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => deleteForMe(m.id)}>
-                    <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف عندي
-                  </DropdownMenuItem>
-                  {canDeleteForEveryone && (
-                    <DropdownMenuItem
-                      onClick={() => deleteForEveryone(m.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف عند الجميع
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            );
-            return (
-              <SwipeToReply key={m.id} onReply={() => setReplyingTo(m)} justify={isSelf ? "start" : "end"}>
-                {isSelf && actions}
-                {!isTemp && (
-                  <button
-                    onClick={() => setReplyingTo(m)}
-                    title="رد"
-                    className="shrink-0 self-center rounded-full p-1 text-foreground/35 transition hover:bg-card/60 hover:text-foreground"
-                  >
-                    <Reply className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <div
-                  ref={(el) => (messageRefs.current[m.id] = el)}
-                  className={
-                    isMedia
-                      ? `relative max-w-[75%] overflow-hidden rounded-2xl shadow-soft transition ${
-                          highlightId === m.id ? "ring-2 ring-accent" : ""
-                        }`
-                      : `relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-soft transition ${
-                          isSelf
-                            ? "rounded-br-md bg-gradient-cosmic text-primary-foreground"
-                            : "rounded-bl-md border border-border/50 bg-card/70"
-                        } ${highlightId === m.id ? "ring-2 ring-accent" : ""}`
-                  }
-                >
-                  {m.forwarded_from_name && (
-                    <span
-                      className={`mb-1 flex items-center gap-1 text-[10px] italic ${
-                        isSelf ? "text-primary-foreground/70" : "text-foreground/50"
-                      }`}
-                    >
-                      <Reply className="h-3 w-3 -scale-x-100" /> محولة من {m.forwarded_from_name}
-                    </span>
-                  )}
-                  {m.reply_to_id && !invite && (
-                    <button
-                      onClick={() => scrollToMessage(m.reply_to_id)}
-                      className={`mb-1.5 block w-full max-w-full truncate rounded-lg border-r-2 px-2 py-1 text-right text-[11px] transition hover:brightness-110 ${
-                        isSelf
-                          ? "border-primary-foreground/50 bg-black/10 text-primary-foreground/85"
-                          : "border-accent bg-accent/10 text-foreground/70"
-                      }`}
-                    >
-                      <span className="block truncate font-semibold">{repliedSenderName}</span>
-                      <span className="block truncate opacity-80">{messagePreviewText(repliedMessage)}</span>
-                    </button>
-                  )}
-                  {invite ? (
-                    <GroupInviteCard invite={invite} onJoined={onJoinedGroup} />
-                  ) : (
-                    m.type === "text" && (
-                      <p className="whitespace-pre-wrap break-words">
-                        <MessageContent content={m.content ?? ""} mentionCandidates={mentionCandidates} isSelf={isSelf} />
-                      </p>
-                    )
-                  )}
-
-                  {m.type === "image" && m.media_url && (
-                    <div className="relative">
-                      <img
-                        src={m.media_url}
-                        onClick={() => setLightboxUrl(m.media_url!)}
-                        className="max-h-72 w-full cursor-pointer rounded-2xl object-cover"
-                      />
-                      <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                        {formatTime(m.created_at)}
-                      </span>
-                    </div>
-                  )}
-
-                  {m.type === "video" && m.media_url && (
-                    <video src={m.media_url} controls className="max-h-72 w-full rounded-2xl" />
-                  )}
-
-                  {m.type === "audio" && m.media_url && (
-                    <audio src={m.media_url} controls className="h-9 w-56 max-w-full" />
-                  )}
-                  {m.type === "file" && m.media_url && (
-                    <FileCard
-                      name={m.content || fileNameFromUrl(m.media_url)}
-                      url={m.media_url}
-                      size={m.media_size_bytes}
-                      tint={isSelf ? "self" : "other"}
-                    />
-                  )}
-                  {m.type !== "text" && !m.media_url && (
-                    <p className="flex items-center gap-1.5 text-xs opacity-70">
-                      <Loader2 className="h-3 w-3 animate-spin" /> {m.content}
-                    </p>
-                  )}
-
-                  {!isMedia && (
-                    <span
-                      className={`mt-1 block text-left text-[10px] ${
-                        isSelf ? "text-primary-foreground/70" : "text-foreground/40"
-                      }`}
-                    >
-                      {formatTime(m.created_at)}
-                    </span>
-                  )}
-                </div>
-                {!isSelf && actions}
-              </SwipeToReply>
-            );
-          })}
-          <div ref={bottomRef} />
-        </div>
-      )}
-
-      <Composer
-        text={text}
-        onTextChange={setText}
-        onSend={sendText}
-        onPickFile={(f) => void sendFile(f)}
-        onSendVoice={(blob) => void sendFile(blobToFile(blob))}
-        uploading={uploading}
-        replyingTo={
-          replyingTo
-            ? {
-                senderName: replyingTo.sender_id === userId ? myName : otherName,
-                preview: messagePreviewText(replyingTo),
-              }
-            : null
-        }
-        onCancelReply={() => setReplyingTo(null)}
-        mentionCandidates={mentionCandidates}
-      />
-
-      {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
-      <ForwardDialog
-        message={
-          forwardMessage
-            ? {
-                type: forwardMessage.type,
-                content: forwardMessage.content,
-                media_url: forwardMessage.media_url,
-                media_size_bytes: forwardMessage.media_size_bytes ?? null,
-                senderName: forwardMessage.sender_id === userId ? myName : otherName,
-              }
-            : null
-        }
-        userId={userId}
-        onClose={() => setForwardMessage(null)}
-      />
-    </div>
-  );
-}
-
-// ============================================================
-// Forward — pick a group (that I'm a member of) or a DM contact to forward
-// a message to. Works for both group-chat and DM messages since it only
-// needs the bare content/type/media, not the source row itself.
-// ============================================================
-type ForwardableMessage = {
-  type: string;
-  content: string | null;
-  media_url: string | null;
-  media_size_bytes?: number | null;
-  senderName: string;
-};
-
-function ForwardDialog({
-  message,
-  userId,
-  onClose,
-}: {
-  message: ForwardableMessage | null;
-  userId: string;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = useState<"groups" | "dm">("groups");
-  const [myGroups, setMyGroups] = useState<{ id: string; name: string; avatar_url?: string | null }[]>([]);
-  const [conversations, setConversations] = useState<
-    { id: string; otherId: string; otherName: string; otherAvatarUrl: string | null }[]
-  >([]);
-  const [busy, setBusy] = useState(false);
-  const [sentTo, setSentTo] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!message) return;
-    setSentTo(new Set());
-    setTab("groups");
-    (async () => {
-      const { data: gm } = await db
-        .from("group_members")
-        .select("group_id, groups(id, name, avatar_url)")
-        .eq("user_id", userId)
-        .eq("status", "active");
-      setMyGroups(((gm ?? []) as any[]).map((r) => r.groups).filter(Boolean));
-
-      const { data: convos } = await db
-        .from("direct_conversations")
-        .select("*")
-        .or(`user_a.eq.${userId},user_b.eq.${userId}`)
-        .order("created_at", { ascending: false });
-      const rows = convos ?? [];
-      const otherIds = rows.map((r: any) => (r.user_a === userId ? r.user_b : r.user_a));
-      const { data: names } = otherIds.length
-        ? await db.rpc("get_profile_names", { p_ids: otherIds })
-        : { data: [] };
-      const nameMap = new Map((names ?? []).map((n: any) => [n.id, n]));
-      setConversations(
-        rows.map((r: any) => {
-          const otherId = r.user_a === userId ? r.user_b : r.user_a;
-          const n = nameMap.get(otherId) as any;
-          return {
-            id: r.id,
-            otherId,
-            otherName: n?.full_name ?? "مستخدم",
-            otherAvatarUrl: n?.avatar_url ?? null,
-          };
-        }),
-      );
-    })();
-  }, [message, userId]);
-
-  async function forwardToGroup(groupId: string) {
-    if (!message) return;
-    setBusy(true);
-    const { error } = await db.from("group_messages").insert({
-      group_id: groupId,
-      sender_id: userId,
-      channel: "general",
-      type: message.type,
-      content: message.content,
-      media_url: message.media_url,
-      media_size_bytes: message.media_size_bytes ?? null,
-      forwarded_from_name: message.senderName,
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setSentTo((prev) => new Set(prev).add(groupId));
-    toast.success("اتوجهت الرسالة");
-  }
-
-  async function forwardToConversation(conversationId: string) {
-    if (!message) return;
-    setBusy(true);
-    const { error } = await db.from("direct_messages").insert({
-      conversation_id: conversationId,
-      sender_id: userId,
-      type: message.type,
-      content: message.content,
-      media_url: message.media_url,
-      media_size_bytes: message.media_size_bytes ?? null,
-      forwarded_from_name: message.senderName,
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setSentTo((prev) => new Set(prev).add(conversationId));
-    toast.success("اتوجهت الرسالة");
-  }
-
-  async function forwardToNewUser(otherId: string) {
-    const { data, error } = await db.rpc("get_or_create_dm", { p_other_user: otherId });
-    if (error) return toast.error(error.message);
-    await forwardToConversation(data as string);
-  }
-
-  return (
-    <Dialog open={!!message} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent dir="rtl">
-        <DialogHeader>
-          <DialogTitle>توجيه الرسالة</DialogTitle>
-        </DialogHeader>
-        <div className="mb-2 flex gap-1.5 rounded-full bg-background/40 p-1">
-          <button
-            onClick={() => setTab("groups")}
-            className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
-              tab === "groups" ? "bg-gradient-cosmic text-primary-foreground" : "text-foreground/60"
-            }`}
-          >
-            الجروبات
-          </button>
-          <button
-            onClick={() => setTab("dm")}
-            className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
-              tab === "dm" ? "bg-gradient-cosmic text-primary-foreground" : "text-foreground/60"
-            }`}
-          >
-            الخاص
-          </button>
-        </div>
-        {tab === "groups" ? (
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {myGroups.length === 0 && (
-              <p className="py-4 text-center text-xs text-foreground/60">مش عضو في أي جروب</p>
-            )}
-            {myGroups.map((g) => (
-              <button
-                key={g.id}
-                disabled={busy}
-                onClick={() => forwardToGroup(g.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-right text-sm transition hover:bg-card/60 disabled:opacity-50"
-              >
-                <GroupAvatar name={g.name} size="sm" avatarUrl={g.avatar_url} />
-                <span className="flex-1 truncate">{g.name}</span>
-                {sentTo.has(g.id) && <span className="text-[10px] text-accent">اتبعتت ✓</span>}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="max-h-48 space-y-1 overflow-y-auto">
-              {conversations.length === 0 && (
-                <p className="py-2 text-center text-xs text-foreground/60">مفيش محادثات لسه</p>
-              )}
-              {conversations.map((c) => (
-                <button
-                  key={c.id}
-                  disabled={busy}
-                  onClick={() => forwardToConversation(c.id)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-right text-sm transition hover:bg-card/60 disabled:opacity-50"
-                >
-                  <GroupAvatar name={c.otherName} size="sm" avatarUrl={c.otherAvatarUrl} />
-                  <span className="flex-1 truncate">{c.otherName}</span>
-                  {sentTo.has(c.id) && <span className="text-[10px] text-accent">اتبعتت ✓</span>}
-                </button>
-              ))}
-            </div>
-            <div className="border-t border-border/50 pt-2">
-              <p className="mb-1 text-xs text-foreground/60">أو ابعتها لحد جديد</p>
-              <SearchUsers onPick={(id) => forwardToNewUser(id)} />
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ============================================================
-// Group settings — visibility ("مين يشوف الجروب؟") + closed/invite-only.
-// ============================================================
-function GroupSettingsDialog({
-  group,
-  userId,
-  onUpdated,
-}: {
-  group: GroupRow;
-  userId: string;
-  onUpdated: (g: GroupRow) => void;
-}) {
-  const [name, setName] = useState(group.name);
-  const [description, setDescription] = useState(group.description ?? "");
-  const [subject, setSubject] = useState(group.subject ?? "");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(group.avatar_url ?? null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  const [visibility, setVisibility] = useState<"all" | "batch" | "people">(group.visibility ?? "all");
-  const [batchYear, setBatchYear] = useState<string>(
-    group.visibility_batch_year ? String(group.visibility_batch_year) : "",
-  );
-  const [isClosed, setIsClosed] = useState<boolean>(!!group.is_closed);
-  const [people, setPeople] = useState<{ id: string; full_name: string }[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [inviteTarget, setInviteTarget] = useState<{ id: string; full_name: string } | null>(null);
-  const [sendingInvite, setSendingInvite] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await db
-        .from("group_visible_users")
-        .select("user_id, profiles(id, full_name)")
-        .eq("group_id", group.id);
-      setPeople(((data ?? []) as any[]).map((r) => r.profiles).filter(Boolean));
-    })();
-  }, [group.id]);
-
-  async function pickAvatar(file: File) {
-    setUploadingAvatar(true);
-    const path = `${group.id}/avatar/${Date.now()}-${file.name}`;
-    const { error: upErr } = await db.storage.from("group-media").upload(path, file, { upsert: false });
-    if (upErr) {
-      setUploadingAvatar(false);
-      return toast.error(upErr.message);
-    }
-    const publicUrl = db.storage.from("group-media").getPublicUrl(path).data.publicUrl;
-    setUploadingAvatar(false);
-    setAvatarUrl(publicUrl);
-  }
-
-  async function save() {
-    if (!name.trim()) return toast.error("لازم يكون في اسم للجروب");
-    setSaving(true);
-    const { data, error } = await db
-      .from("groups")
-      .update({
-        name: name.trim(),
-        description: description.trim() || null,
-        subject: subject.trim() || null,
-        avatar_url: avatarUrl,
-        visibility,
-        visibility_batch_year: visibility === "batch" ? Number(batchYear) || null : null,
-        is_closed: isClosed,
-      })
-      .eq("id", group.id)
-      .select("*")
-      .single();
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("اتحفظت إعدادات الجروب");
-    onUpdated(data as GroupRow);
-  }
-
-  async function addPerson(id: string, name: string) {
-    if (people.some((p) => p.id === id)) return;
-    const { error } = await db
-      .from("group_visible_users")
-      .insert({ group_id: group.id, user_id: id, added_by: userId });
-    if (error) return toast.error(error.message);
-    setPeople((prev) => [...prev, { id, full_name: name }]);
-  }
-
-  async function removePerson(id: string) {
-    await db.from("group_visible_users").delete().eq("group_id", group.id).eq("user_id", id);
-    setPeople((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  async function sendInvite() {
-    if (!inviteTarget) return;
-    setSendingInvite(true);
-    const { data: code, error } = await db.rpc("create_group_invite", {
-      p_group_id: group.id,
-      p_target_user_id: inviteTarget.id,
-    });
-    if (error) {
-      setSendingInvite(false);
-      return toast.error(error.message);
-    }
-    const { data: conversationId, error: dmErr } = await db.rpc("get_or_create_dm", {
-      p_other_user: inviteTarget.id,
-    });
-    if (dmErr) {
-      setSendingInvite(false);
-      return toast.error(dmErr.message);
-    }
-    const { error: msgErr } = await db.from("direct_messages").insert({
-      conversation_id: conversationId,
-      sender_id: userId,
-      type: "text",
-      content: buildGroupInviteContent(code as string, group.name),
-    });
-    setSendingInvite(false);
-    if (msgErr) return toast.error(msgErr.message);
-    toast.success(`اتبعتت الدعوة لـ ${inviteTarget.full_name}`);
-    setInviteTarget(null);
-  }
-
-  return (
-    <div className="max-h-[70vh] space-y-4 overflow-y-auto pl-1">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => avatarInputRef.current?.click()}
-          disabled={uploadingAvatar}
-          className="group relative shrink-0"
-          title="غيّر صورة الجروب"
-        >
-          <GroupAvatar name={name || group.name} size="lg" avatarUrl={avatarUrl} />
-          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition group-hover:opacity-100">
-            {uploadingAvatar ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
-            ) : (
-              <ImageIcon className="h-4 w-4 text-white" />
-            )}
-          </span>
-        </button>
-        <input
-          ref={avatarInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void pickAvatar(f);
-            e.target.value = "";
-          }}
-        />
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-xs text-foreground/60">صورة الجروب</p>
-          {avatarUrl && (
-            <button
-              onClick={() => setAvatarUrl(null)}
-              className="text-[11px] text-destructive hover:underline"
-            >
-              شيل الصورة
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs text-foreground/70">اسم الجروب</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-foreground/70">المادة (اختياري)</Label>
-        <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-foreground/70">الوصف (اختياري)</Label>
-        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-      </div>
-
-      <div className="space-y-1.5 border-t border-border/50 pt-3">
-        <Label className="text-xs text-foreground/70">مين يقدر يشوف الجروب ده؟</Label>
-        <Select value={visibility} onValueChange={(v) => setVisibility(v as "all" | "batch" | "people")}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">كل الدفعات</SelectItem>
-            <SelectItem value="batch">دفعة معينة بس</SelectItem>
-            <SelectItem value="people">أشخاص محددين بس</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {visibility === "batch" && (
-        <Input
-          type="number"
-          placeholder="سنة الدفعة (مثال 2023)"
-          value={batchYear}
-          onChange={(e) => setBatchYear(e.target.value)}
-        />
-      )}
-
-      {visibility === "people" && (
-        <div className="space-y-2">
-          <SearchUsers onPick={(id, name) => addPerson(id, name)} />
-          {people.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {people.map((p) => (
-                <span key={p.id} className="flex items-center gap-1 rounded-full bg-card/70 px-2 py-1 text-xs">
-                  {p.full_name}
-                  <button onClick={() => removePerson(p.id)}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <label className="flex items-center gap-2 text-sm text-foreground/80">
-        <input type="checkbox" checked={isClosed} onChange={(e) => setIsClosed(e.target.checked)} />
-        الجروب مغلق — مايظهرش لحد، الدخول بدعوة بس من الأدمن
-      </label>
-
-      <Button className="w-full" onClick={save} disabled={saving}>
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "حفظ الإعدادات"}
-      </Button>
-
-      {isClosed && (
-        <div className="space-y-2 border-t border-border/50 pt-3">
-          <Label className="text-xs text-foreground/70">ابعت دعوة دخول (تستخدم مرة واحدة)</Label>
-          {inviteTarget ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-card/60 px-3 py-2 text-sm">
-              <span className="truncate">{inviteTarget.full_name}</span>
-              <div className="flex shrink-0 gap-1.5">
-                <Button size="sm" onClick={sendInvite} disabled={sendingInvite}>
-                  {sendingInvite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "بعت الدعوة"}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setInviteTarget(null)}>
-                  إلغاء
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <SearchUsers onPick={(id, name) => setInviteTarget({ id, full_name: name })} />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// The card rendered inside a DM when its content is a group-invite marker
-// — "دعوة لجروب X" with a one-tap join button. Redeeming burns the invite
-// server-side (redeem_group_invite), so a second tap on the same card (by
-// anyone, including the original recipient) will just fail cleanly.
-// ============================================================
-function GroupInviteCard({
-  invite,
-  onJoined,
-}: {
-  invite: { code: string; groupName: string };
-  onJoined: (groupId: string) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-
-  async function join() {
-    setBusy(true);
-    const { data, error } = await db.rpc("redeem_group_invite", { p_code: invite.code });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setDone(true);
-    toast.success("انضممت للجروب");
-    onJoined(data as string);
-  }
-
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-card/60 px-3 py-2">
-      <Users className="h-4 w-4 shrink-0 text-accent" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">دعوة لجروب: {invite.groupName}</p>
-        <p className="text-[11px] text-foreground/60">الدعوة دي تستخدم مرة واحدة بس</p>
-      </div>
-      <Button size="sm" disabled={busy || done} onClick={join}>
-        {done ? "اتضم ✓" : busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "دخول"}
-      </Button>
-    </div>
-  );
-}
