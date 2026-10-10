@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
+import { AccountGuard } from "@/components/AccountGuard";
 
 function NotFoundComponent() {
   return (
@@ -130,6 +131,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <AccountGuard />
       <Toaster position="top-center" richColors closeButton dir="rtl" />
     </QueryClientProvider>
   );
