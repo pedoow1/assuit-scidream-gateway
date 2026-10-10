@@ -237,24 +237,32 @@ export function suggestFileName(m: { type?: string | null; content?: string | nu
   return name;
 }
 
-/** تحميل فعلي للملف (مش فتح في تاب) — لو المتصفح منع، بيفتحه في تاب جديد */
+/** تحميل فعلي للملف (مش فتح في تاب).
+ *  بيشتغل مباشرة لو الـ bucket عليه CORS للموقع (شوف b2-cors.json).
+ *  لو CORS مش متظبط، المتصفح بيمنع الـ fetch فبنضطر نفتح تاب كحل أخير. */
 export async function downloadFile(url: string, name: string) {
   if (!url) { toast.error("الملف لسه بيتجهّز، جرّب كمان ثانية"); return; }
+  const id = toast.loading("بيتحمّل...");
   try {
-    const res = await fetch(url);
+    // no-store: الصورة اتحمّلت قبل كده بـ <img> من غير CORS والمتصفح مخزّنها، فلازم نتخطى الكاش
+    const res = await fetch(url, { mode: "cors", credentials: "omit", cache: "no-store" });
     if (!res.ok) throw new Error(String(res.status));
     const blob = await res.blob();
     const obj = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = obj;
     a.download = name || "file";
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(obj), 30_000);
-  } catch {
+    setTimeout(() => URL.revokeObjectURL(obj), 60_000);
+    toast.success("اتحمّل ✅", { id });
+  } catch (err) {
+    console.warn("downloadFile blocked (probably CORS on the storage bucket):", err);
+    toast.dismiss(id);
     window.open(url, "_blank", "noopener");
-    toast("اتفتح الملف في تاب جديد — احفظه من هناك");
+    toast("التحميل المباشر متقفل من إعدادات التخزين (CORS) — اتفتح في تاب بدل كده");
   }
 }
 
