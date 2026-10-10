@@ -17,13 +17,14 @@ import { useAuth, isAdminRole, type ProfileRow, type AppRole } from "@/lib/auth"
 import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
+import { BigBossPanel } from "@/components/BigBossPanel";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "لوحة الأدمن — Dream Team" }] }),
   component: AdminPage,
 });
 
-type Tab = "verification" | "admins" | "applications";
+type Tab = "verification" | "admins" | "applications" | "control";
 
 const OWNER_EMAIL = "abdalahkotp31@gmail.com";
 
@@ -90,12 +91,18 @@ function AdminPage() {
               إدارة الأدمن
             </TabBtn>
           )}
+          {isSuper && (
+            <TabBtn active={tab === "control"} onClick={() => setTab("control")}>
+              التحكم الكامل
+            </TabBtn>
+          )}
         </div>
 
         <div className="mt-6">
           {tab === "verification" && <VerificationTab />}
           {tab === "applications" && <ApplicationsTab />}
           {tab === "admins" && isSuper && <AdminsTab />}
+          {tab === "control" && isSuper && <BigBossPanel />}
         </div>
       </main>
     </div>
