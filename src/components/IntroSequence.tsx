@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 
-const VIDEO_INTRO = "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6151238-hd_1920_1080_30fps.mp4";
-const VIDEO_BG    = "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/12665387_2088_720_60fps.mp4";
+// الفيديوهات متقفلة مؤقتًا: كانت بتتحمّل من Supabase مع كل زيارة وبتستهلك الـ Egress كله.
+// لما تضغطهم (حوالي 1–2 ميجا) وتحطهم على Backblaze أو في public/ حط الرابط هنا وهيشتغلوا تاني.
+const VIDEO_INTRO = "";
+const VIDEO_BG    = "";
+// صورة الخلفية (حوالي 10 كيلوبايت) من مجلد public/ — بتتحمّل مرة وبتتخزّن عند المستخدم
+const BG_IMAGE    = "/bg.webp";
 
 interface Props {
   onComplete: () => void;
@@ -33,16 +37,27 @@ export function IntroSequence({ onComplete }: Props) {
       opacity: exiting ? 0 : 1,
       transition: exiting ? "opacity 0.7s ease-in-out" : "none",
     }}>
-      <video
-        ref={videoRef} src={VIDEO_INTRO} muted playsInline loop
-        style={{
+      {!VIDEO_INTRO && (
+        <div style={{
           position: "absolute", inset: 0,
-          width: "100%", height: "100%", objectFit: "cover",
-          opacity: videoVisible ? 0.60 : 0,
+          backgroundImage: `url(${BG_IMAGE})`, backgroundSize: "cover", backgroundPosition: "center",
+          opacity: videoVisible ? 0.85 : 0,
           transition: "opacity 1.6s ease-in-out",
           pointerEvents: "none",
-        }}
-      />
+        }} />
+      )}
+      {VIDEO_INTRO && (
+        <video
+          ref={videoRef} src={VIDEO_INTRO} muted playsInline loop preload="metadata"
+          style={{
+            position: "absolute", inset: 0,
+            width: "100%", height: "100%", objectFit: "cover",
+            opacity: videoVisible ? 0.60 : 0,
+            transition: "opacity 1.6s ease-in-out",
+            pointerEvents: "none",
+          }}
+        />
+      )}
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.65) 100%)",
@@ -60,15 +75,23 @@ export function VideoBackground() {
   useEffect(() => { videoRef.current?.play().catch(() => {}); }, []);
   return (
     <>
-      <video
-        ref={videoRef} src={VIDEO_BG}
-        muted playsInline loop autoPlay
-        style={{
-          position: "fixed", inset: 0, zIndex: 0,
-          width: "100%", height: "100%", objectFit: "cover",
-          pointerEvents: "none",
-        }}
-      />
+      {VIDEO_BG ? (
+        <video
+          ref={videoRef} src={VIDEO_BG}
+          muted playsInline loop autoPlay preload="metadata"
+          style={{
+            position: "fixed", inset: 0, zIndex: 0,
+            width: "100%", height: "100%", objectFit: "cover",
+            pointerEvents: "none",
+          }}
+        />
+      ) : (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none",
+          backgroundColor: "#05050f",
+          backgroundImage: `url(${BG_IMAGE})`, backgroundSize: "cover", backgroundPosition: "center",
+        }} />
+      )}
       <div style={{
         position: "fixed", inset: 0, zIndex: 1,
         background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 40%, rgba(0,0,0,0.65) 100%)",
