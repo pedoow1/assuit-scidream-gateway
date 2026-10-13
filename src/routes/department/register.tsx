@@ -23,6 +23,7 @@ import {
   type DepartmentApplication,
   type DepartmentRegistration,
 } from "@/lib/department";
+import { uploadToB2 } from "@/lib/b2";
 
 export const Route = createFileRoute("/department/register")({
   head: () => ({ meta: [{ title: `تسجيل المواد — قسم ${DEPARTMENT_NAME}` }] }),
@@ -133,10 +134,11 @@ function RegisterPage() {
   async function uploadReceipt(reg: DepartmentRegistration, file: File) {
     if (!user) return;
     setUploading(reg.id);
-    const path = `${user.id}/${reg.id}-${Date.now()}-${file.name}`;
-    const { error: upErr } = await supabase.storage.from("department-receipts").upload(path, file);
-    if (upErr) {
-      toast.error(upErr.message);
+    let path: string;
+    try {
+      path = (await uploadToB2("receipt", user.id, file)).ref;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل رفع الإيصال");
       setUploading(null);
       return;
     }
