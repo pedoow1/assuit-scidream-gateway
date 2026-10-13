@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { Upload, Loader2, ArrowLeft } from "lucide-react";
+import { uploadToB2 } from "@/lib/b2";
 
 export const Route = createFileRoute("/complete-profile")({
   head: () => ({ meta: [{ title: "استكمال البيانات — Assuit SciDream" }] }),
@@ -64,11 +65,7 @@ function CompleteProfilePage() {
       let idCardUrl = profile?.id_card_url ?? null;
 
       if (idFile) {
-        const ext = idFile.name.split(".").pop() ?? "jpg";
-        const path = `${user.id}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("id-cards").upload(path, idFile, { upsert: true, contentType: idFile.type });
-        if (upErr) throw upErr;
-        idCardUrl = path;
+        idCardUrl = (await uploadToB2("id-card", user.id, idFile)).ref;
       }
 
       const { error } = await supabase
