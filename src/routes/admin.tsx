@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { BigBossPanel } from "@/components/BigBossPanel";
+import { resolveFileUrl } from "@/lib/b2";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "لوحة الأدمن — Dream Team" }] }),
@@ -159,14 +160,12 @@ function VerificationTab() {
       toast.error("لا توجد صورة");
       return;
     }
-    const { data, error } = await supabase.storage
-      .from("id-cards")
-      .createSignedUrl(row.id_card_url, 600);
-    if (error || !data) {
+    const url = await resolveFileUrl(row.id_card_url, "id-cards", 600);
+    if (!url) {
       toast.error("تعذر فتح الصورة");
       return;
     }
-    setPreview({ row, url: data.signedUrl });
+    setPreview({ row, url });
   }
 
   async function approve(row: ProfileRow) {
