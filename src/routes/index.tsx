@@ -470,7 +470,7 @@ function LandingPage() {
         <div className="mb-6">
           <div className="grid gap-5 max-w-md mx-auto">
             {[
-              { name: "أ.د فاطمة الزهراء عبدالحميد", role: "المشرفة الأكاديمية على الأسرة", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260628-WA0034.jpg" },
+              { name: "أ.د فاطمة الزهراء عبدالحميد", role: "المشرفة الأكاديمية على الأسرة", img: "/images/IMG-20260628-WA0034.jpg" },
             ].map((p) => (
               <motion.div
                 key={p.name}
@@ -515,13 +515,13 @@ function LandingPage() {
                 name: "خالد عماد",
                 role: "رئيس أسرة Dream Team",
                 bio: "يقود فريق العمل ويضطلع بمسؤولية التخطيط والتنظيم والإشراف على تنفيذ الأنشطة والفعاليات، مع الحرص الدائم على تحقيق أهداف الأسرة وخدمة طلاب كلية العلوم. يعمل على تعزيز روح التعاون بين أعضاء الفريق، وتبني الأفكار الإبداعية، وتمثيل الأسرة بصورة مشرفة داخل الكلية — إيمانًا بأن النجاح الحقيقي يبدأ بفريق متماسك ورؤية واضحة.",
-                img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/IMG-20260627-WA0026.jpg",
+                img: "/images/IMG-20260627-WA0026.jpg",
               },
               {
                 name: "عبد الله قطب",
                 role: "مصمم الموقع ومسؤول السوشيال ميديا",
                 bio: "يتولى تصميم وتطوير الهوية الرقمية للأسرة، من بناء الموقع الإلكتروني وإدارة منظومته التقنية، إلى صياغة المحتوى الرقمي وإدارة حسابات التواصل الاجتماعي. يعمل على إيصال رسالة الأسرة بأسلوب احترافي وجذاب، ويسعى إلى تقديم تجربة رقمية متميزة تعكس قيم Dream Team وطموحاتها.",
-                img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/6193778187.png",
+                img: "/images/6193778187.png",
               },
             ].map((p) => (
               <motion.div
@@ -792,11 +792,11 @@ function CommitteeApplicationSection() {
   const [selectedCommittee, setSelectedCommittee] = useState<string | null>(null);
 
   const committees = [
-    { name: "PR Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/bhgnnvg.jpeg" },
-    { name: "Media Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/hgbjyvv.jpeg" },
-    { name: "HR Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/hvgghgvv.jpeg" },
-    { name: "OC Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ojjgthn.jpeg" },
-    { name: "AC Committee", img: "https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ooooo.jpeg" },
+    { name: "PR Committee", img: "/images/bhgnnvg.jpeg" },
+    { name: "Media Committee", img: "/images/hgbjyvv.jpeg" },
+    { name: "HR Committee", img: "/images/hvgghgvv.jpeg" },
+    { name: "OC Committee", img: "/images/ojjgthn.jpeg" },
+    { name: "AC Committee", img: "/images/ooooo.jpeg" },
   ];
 
   return (
@@ -810,7 +810,7 @@ function CommitteeApplicationSection() {
       {/* Join Us Banner */}
       <div className="flex justify-center mb-8">
         <img
-          src="https://zkojnnxqxbjbdxtniucp.supabase.co/storage/v1/object/public/images/ggfghbbb.jpeg"
+          src="/images/ggfghbbb.jpeg"
           alt="انضم إلى Dream Team"
           className="w-full max-w-sm rounded-2xl object-cover shadow-lg"
         />
