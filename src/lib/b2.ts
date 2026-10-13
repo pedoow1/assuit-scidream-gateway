@@ -4,12 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 // Drop-in replacement: same exports as the old Backblaze helper, but new uploads go to
 // Cloudflare R2 through the `r2-storage` edge function. Old `b2://` refs still resolve
 // through the legacy `b2-storage` function until they are migrated.
-export type B2Kind = "group-media" | "dm-media";
+export type B2Kind =
+  | "group-media" | "dm-media"
+  | "avatar" | "group-avatar" | "announcement"
+  | "id-card" | "receipt" | "subject-file" | "course-file";
 const R2 = "r2://";
 const B2 = "b2://";
 const fnFor = (ref: string) => (ref.startsWith(B2) ? "b2-storage" : "r2-storage");
 
-/** Upload straight to R2 via a presigned PUT. Returns the ref to store in media_url. */
+/** Upload straight to R2 via a presigned PUT. Returns the ref to store in the DB
+ *  (public kinds -> full CDN url, private kinds -> r2://key). */
 export async function uploadToB2(kind: B2Kind, scopeId: string, file: File): Promise<{ ref: string }> {
   const { data, error } = await supabase.functions.invoke("r2-storage", {
     body: { action: "upload", kind, scope_id: scopeId, filename: file.name, size: file.size },
@@ -96,4 +100,43 @@ export function useB2Urls() {
     listeners.add(l);
     return () => { listeners.delete(l); };
   }, []);
+}
+
+// ---------- one-off helpers for non-chat files ----------
+const SB_URL_RE = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/([^?]+)/;
+
+/** Async: ref -> openable URL. r2:// -> signed R2 url. Legacy Supabase path -> signed Supabase url (until migrated). */
+export async function resolveFileUrl(ref: string, legacyBucket?: string, ttl = 3600): Promise<string | null> {
+  if (!ref) return null;
+  if (ref.startsWith(R2)) {
+    const hit = cache.get(ref);
+    if (hit && hit.exp > Date.now()) return hit.url;
+    const { data, error } = await supabase.functions.invoke("r2-storage", { body: { action: "sign", refs: [ref] } });
+    const url = !error ? data?.urls?.[ref] : null;
+    if (url) cache.set(ref, { url, exp: Date.now() + (Number(data.ttl ?? 3600) - 300) * 1000 });
+    return url ?? null;
+  }
+  if (/^https?:/.test(ref)) return ref;
+  if (!legacyBucket) return null;
+  const m = ref.match(SB_URL_RE);
+  const { data } = await supabase.storage.from(m?.[1] ?? legacyBucket).createSignedUrl(m?.[2] ?? ref, ttl);
+  return data?.signedUrl ?? null;
+}
+
+/** Delete one stored file, whether it is on R2 or still on legacy Supabase Storage. */
+export async function deleteFile(ref: string | null | undefined, legacyBucket?: string) {
+  if (!ref) return;
+  if (ref.startsWith(R2) || ref.startsWith("http")) { await deleteFromB2([ref]); return; }
+  if (legacyBucket) await supabase.storage.from(legacyBucket).remove([ref]);
+}
+
+export type CourseFile = { name: string; ref: string; size: number; updated_at: string };
+
+/** Course files live under course-file/all/ in the private bucket. */
+export async function listCourseFiles(): Promise<CourseFile[]> {
+  const { data, error } = await supabase.functions.invoke("r2-storage", { body: { action: "list-courses" } });
+  if (error) throw error;
+  return ((data?.files ?? []) as { key: string; size: number; last_modified: string }[])
+    .map((f) => ({ name: f.key.split("/").pop() ?? f.key, ref: R2 + f.key, size: f.size, updated_at: f.last_modified }))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
