@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Loader2, ArrowLeft, GraduationCap, Download, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadToB2, deleteFromB2, resolveFileUrl, listCourseFiles } from "@/lib/b2";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 
@@ -19,7 +19,8 @@ type CourseFile = {
   metadata: { size: number };
 };
 
-const BUCKET = "courses";
+const REF_PREFIX = "r2://course-file/all/";
+const refOf = (name: string) => REF_PREFIX + name;
 
 function CoursesPage() {
   const { user, roles, loading } = useAuth();
@@ -38,11 +39,13 @@ function CoursesPage() {
 
   const loadFiles = useCallback(async () => {
     setFetching(true);
-    const { data, error } = await supabase.storage.from(BUCKET).list("", {
-      sortBy: { column: "updated_at", order: "desc" },
-    });
-    if (error) toast.error("تعذر تحميل الملفات");
-    setFiles((data ?? []) as CourseFile[]);
+    try {
+      const list = await listCourseFiles();
+      setFiles(list.map((f) => ({ name: f.name, id: f.ref, updated_at: f.updated_at, metadata: { size: f.size } })));
+    } catch {
+      toast.error("تعذر تحميل الملفات");
+      setFiles([]);
+    }
     setFetching(false);
   }, []);
 
@@ -53,10 +56,12 @@ function CoursesPage() {
     if (!fileList || fileList.length === 0) return;
     setUploading(true);
     for (const file of Array.from(fileList)) {
-      const path = `${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file);
-      if (error) toast.error(`فشل رفع ${file.name}`);
-      else toast.success(`تم رفع ${file.name} ✨`);
+      try {
+        await uploadToB2("course-file", "all", file);
+        toast.success(`تم رفع ${file.name} ✨`);
+      } catch (err) {
+        toast.error(err instanceof Error ? `فشل رفع ${file.name}: ${err.message}` : `فشل رفع ${file.name}`);
+      }
     }
     setUploading(false);
     e.target.value = "";
@@ -64,9 +69,9 @@ function CoursesPage() {
   }
 
   async function getSignedUrl(fileName: string) {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(fileName, 3600);
-    if (error || !data) { toast.error("تعذر فتح الملف"); return null; }
-    return data.signedUrl;
+    const url = await resolveFileUrl(refOf(fileName));
+    if (!url) { toast.error("تعذر فتح الملف"); return null; }
+    return url;
   }
 
   async function handleOpen(fileName: string) {
@@ -79,14 +84,13 @@ function CoursesPage() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = fileName;
+    a.download = cleanName(fileName);
     a.click();
   }
 
   async function handleDelete(fileName: string) {
     if (!confirm(`هتحذف "${fileName}"؟`)) return;
-    const { error } = await supabase.storage.from(BUCKET).remove([fileName]);
-    if (error) { toast.error("فشل الحذف"); return; }
+    try { await deleteFromB2([refOf(fileName)]); } catch { toast.error("فشل الحذف"); return; }
     toast.success("تم الحذف");
     loadFiles();
   }
