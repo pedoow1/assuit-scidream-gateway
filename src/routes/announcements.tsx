@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
+import { uploadToB2 } from "@/lib/b2";
 
 export const Route = createFileRoute("/announcements")({
   head: () => ({ meta: [{ title: "الإعلانات — Assuit SciDream" }] }),
@@ -56,16 +57,13 @@ function AnnouncementsPage() {
     setUploading(true);
     let image_url: string | null = null;
     if (imageFile) {
-      const path = `${Date.now()}-${imageFile.name}`;
-      const { error: upErr } = await supabase.storage
-        .from("announcement-images")
-        .upload(path, imageFile);
-      if (upErr) {
-        toast.error(upErr.message);
+      try {
+        image_url = (await uploadToB2("announcement", user.id, imageFile)).ref;
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "فشل رفع الصورة");
         setUploading(false);
         return;
       }
-      image_url = supabase.storage.from("announcement-images").getPublicUrl(path).data.publicUrl;
     }
     const { error } = await supabase.from("announcements").insert({
       title: form.title,
