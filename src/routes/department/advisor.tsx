@@ -22,6 +22,7 @@ import {
   type DepartmentRegistration,
   type DepartmentReceipt,
 } from "@/lib/department";
+import { resolveFileUrl } from "@/lib/b2";
 
 export const Route = createFileRoute("/department/advisor")({
   head: () => ({ meta: [{ title: `لوحة المشرف — قسم ${DEPARTMENT_NAME}` }] }),
@@ -457,11 +458,9 @@ function ReceiptsTab() {
   }, [load]);
 
   async function view(row: ReceiptRow) {
-    const { data, error } = await supabase.storage
-      .from("department-receipts")
-      .createSignedUrl(row.file_url, 600);
-    if (error || !data) return toast.error("تعذر فتح الإيصال");
-    setPreview({ url: data.signedUrl, row });
+    const url = await resolveFileUrl(row.file_url, "department-receipts", 600);
+    if (!url) return toast.error("تعذر فتح الإيصال");
+    setPreview({ url, row });
   }
 
   async function decide(row: ReceiptRow, status: "confirmed" | "rejected") {
