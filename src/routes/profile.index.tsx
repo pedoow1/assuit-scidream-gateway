@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, ArrowLeft, Camera, Check, X as XIcon, Lock, Volume2 } from "lucide-react";
 import { sendFriendNotification } from "@/hooks/use-notifications";
 import { getSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
+import { uploadToB2 } from "@/lib/b2";
 
 const db = supabase as any;
 
@@ -94,16 +95,13 @@ function MyProfilePage() {
   async function uploadAvatar(file: File) {
     if (!user) return;
     setUploadingAvatar(true);
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, contentType: file.type });
-    if (upErr) {
+    let publicUrl: string;
+    try {
+      publicUrl = (await uploadToB2("avatar", user.id, file)).ref;
+    } catch (e) {
       setUploadingAvatar(false);
-      return toast.error(upErr.message);
+      return toast.error(e instanceof Error ? e.message : "فشل رفع الصورة");
     }
-    const publicUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
     const { error } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
     setUploadingAvatar(false);
     if (error) return toast.error(error.message);
