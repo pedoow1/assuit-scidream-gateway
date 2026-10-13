@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveFileUrl } from "@/lib/b2";
 
 // New tables/RPCs are not in the generated types yet.
 const db = supabase as any;
@@ -249,9 +250,9 @@ function IntelAgent() {
   async function openIdCard(r: Dossier) {
     const path = r.profile.id_card_url;
     if (!path) return toast.error("مفيش بطاقة مرفوعة");
-    const { data, error } = await supabase.storage.from("id-cards").createSignedUrl(path, 600);
-    if (error || !data) return toast.error(error?.message ?? "تعذّر فتح البطاقة");
-    window.open(data.signedUrl, "_blank");
+    const url = await resolveFileUrl(path, "id-cards", 600);
+    if (!url) return toast.error("تعذّر فتح البطاقة");
+    window.open(url, "_blank");
   }
 
   return (
