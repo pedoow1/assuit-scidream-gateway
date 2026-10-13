@@ -7,7 +7,7 @@ export interface ChatMessage {
 }
 
 export const chatWithAssistant = createServerFn({ method: "POST" })
-  .inputValidator((input: { messages: ChatMessage[] }) => {
+  .validator((input: { messages: ChatMessage[] }) => {
     if (!input?.messages || !Array.isArray(input.messages)) {
       throw new Error("messages is required");
     }
