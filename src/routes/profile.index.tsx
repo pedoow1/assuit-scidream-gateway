@@ -12,6 +12,8 @@ import { Loader2, ArrowLeft, Camera, Check, X as XIcon, Lock, Volume2 } from "lu
 import { sendFriendNotification } from "@/hooks/use-notifications";
 import { getSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
 import { uploadToB2 } from "@/lib/b2";
+import { RatingBadge } from "@/components/RatingBadge";
+import { SummariesSection } from "@/components/SummariesSection";
 
 const db = supabase as any;
 
@@ -172,7 +174,10 @@ function MyProfilePage() {
               />
             </div>
 
-            <h1 className="mt-4 font-display text-2xl">{profile?.full_name}</h1>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <h1 className="font-display text-2xl">{profile?.full_name}</h1>
+              <RatingBadge userId={user.id} />
+            </div>
             <p className="mt-0.5 text-xs text-foreground/50">
               الاسم زي ما هو في بطاقتك الجامعية — متقدرش تغيره من هنا
             </p>
@@ -283,6 +288,8 @@ function MyProfilePage() {
             )}
           </div>
         </div>
+
+        <SummariesSection userId={user.id} own />
       </div>
     </div>
   );
