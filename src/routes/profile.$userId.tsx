@@ -8,6 +8,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, UserPlus, UserCheck, UserX, Clock3, MessageCircle } from "lucide-react";
 import { sendFriendNotification } from "@/hooks/use-notifications";
+import { RatingBadge } from "@/components/RatingBadge";
+import { SummariesSection } from "@/components/SummariesSection";
 
 const db = supabase as any;
 
@@ -236,7 +238,10 @@ function PublicProfilePage() {
             <AvatarFallback className="font-display text-2xl">{target.full_name?.trim().charAt(0)}</AvatarFallback>
           </Avatar>
 
-          <h1 className="mt-4 font-display text-2xl">{target.full_name}</h1>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <h1 className="font-display text-2xl">{target.full_name}</h1>
+            <RatingBadge userId={target.id} />
+          </div>
           {badge && (
             <span className="mt-2 inline-block rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent">
               {badge}
@@ -285,6 +290,8 @@ function PublicProfilePage() {
             </div>
           )}
         </div>
+
+        <SummariesSection userId={target.id} own={isOwnProfile} />
       </div>
     </div>
   );
