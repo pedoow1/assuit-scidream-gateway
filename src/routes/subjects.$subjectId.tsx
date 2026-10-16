@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Loader2, ArrowLeft, FolderPlus, Folder, FileText, Youtube, Link as LinkIcon,
-  Plus, ChevronLeft, ChevronDown, X, Trash2, Upload, Download, HardDriveDownload, Pencil,
+  Plus, ChevronLeft, ChevronDown, X, Trash2, Upload, Download, HardDriveDownload, Pencil, ArrowUpDown, Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
@@ -12,6 +12,7 @@ import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
 import { extractYouTubeId } from "@/lib/youtube";
 import { uploadToB2, deleteFile, resolveFileUrl } from "@/lib/b2";
+import { SortableList } from "@/components/SortableList";
 
 export const Route = createFileRoute("/subjects/$subjectId")({
   head: () => ({ meta: [{ title: "المادة — Assuit SciDream" }] }),
@@ -43,6 +44,7 @@ function SubjectDetailPage() {
   const [showAddContent, setShowAddContent] = useState(false);
   const [showImportDrive, setShowImportDrive] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [reorder, setReorder] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -114,6 +116,14 @@ function SubjectDetailPage() {
     if (error) return toast.error(error.message);
     toast.success("اتمسح");
     qc.invalidateQueries({ queryKey: ["content", subjectId, currentFolderId] });
+  }
+
+  async function saveOrder(table: "folders" | "content_items", next: { id: string }[]) {
+    const res = await Promise.all(next.map((r, i) => (supabase as any).from(table).update({ sort_order: i }).eq("id", r.id)));
+    const bad = res.find((r: any) => r.error);
+    if (bad) toast.error((bad as any).error.message);
+    else toast.success("اتحفظ الترتيب ✨");
+    qc.invalidateQueries({ queryKey: table === "folders" ? ["folders", subjectId] : ["content", subjectId, currentFolderId] });
   }
 
   async function openPdf(path: string) {
@@ -215,6 +225,14 @@ function SubjectDetailPage() {
                     <HardDriveDownload className="h-3.5 w-3.5" /> استيراد من Drive
                   </button>
                 )}
+                {(childFolders.length > 1 || (currentFolderId && items.length > 1)) && (
+                  <button
+                    onClick={() => setReorder((v) => !v)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold ${reorder ? "border-accent bg-accent/20 text-accent" : "border-border bg-card/60 hover:border-accent"}`}
+                  >
+                    {reorder ? <Check className="h-3.5 w-3.5" /> : <ArrowUpDown className="h-3.5 w-3.5" />} {reorder ? "تم" : "ترتيب"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -222,6 +240,20 @@ function SubjectDetailPage() {
             {childFolders.length > 0 && (
               <div className="mt-6">
                 <h2 className="text-sm font-semibold text-foreground/75">الفولدرات</h2>
+                {reorder && isAdmin ? (
+                  <div className="mt-3">
+                    <SortableList
+                      items={childFolders}
+                      onReorder={(n) => void saveOrder("folders", n)}
+                      renderRow={(f) => (
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gold/40 to-rose/30"><Folder className="h-4 w-4" /></div>
+                          <div className="truncate font-medium">{f.name}</div>
+                        </div>
+                      )}
+                    />
+                  </div>
+                ) : (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {childFolders.map((f) => (
                     <div key={f.id} className="cosmic-card group flex items-center justify-between rounded-2xl p-4 transition hover:shadow-glow">
@@ -244,6 +276,7 @@ function SubjectDetailPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -254,6 +287,21 @@ function SubjectDetailPage() {
                 {items.length === 0 ? (
                   <div className="mt-3 cosmic-card rounded-2xl p-8 text-center text-sm text-foreground/75">
                     مفيش محتوى لحد دلوقتي.
+                  </div>
+                ) : reorder && isAdmin ? (
+                  <div className="mt-3">
+                    <SortableList
+                      items={items}
+                      onReorder={(n) => void saveOrder("content_items", n)}
+                      renderRow={(it) => (
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+                            {it.type === "pdf" ? <FileText className="h-4 w-4 text-rose" /> : it.type === "youtube" ? <Youtube className="h-4 w-4 text-gold" /> : <LinkIcon className="h-4 w-4 text-gold" />}
+                          </div>
+                          <div className="truncate text-sm font-medium">{it.title}</div>
+                        </div>
+                      )}
+                    />
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
@@ -413,25 +461,64 @@ function AddFolderModal({ subjectId, parentId, folder, onClose, onDone }: {
   );
 }
 
+const MAX_BATCH = 20;
+const baseName = (n: string) => n.replace(/\.[^.]+$/, "");
+
 function AddContentModal({ folderId, onClose, onDone }: { folderId: string; onClose: () => void; onDone: () => void }) {
   const [type, setType] = useState<"pdf" | "youtube" | "link">("pdf");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [youtubeInput, setYoutubeInput] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  function addFiles(list: FileList | null) {
+    if (!list?.length) return;
+    setFiles((prev) => {
+      const key = (f: File) => `${f.name}-${f.size}-${f.lastModified}`;
+      const seen = new Set(prev.map(key));
+      return [...prev, ...Array.from(list).filter((f) => !seen.has(key(f)))].slice(0, MAX_BATCH);
+    });
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (type === "pdf") {
+      if (!files.length) return toast.error("اختر ملف PDF");
+      setSaving(true);
+      let ok = 0;
+      const failed: string[] = [];
+      // كل ملف بيترفع وبيتسجّل لوحده ورا بعض، عشان الترتيب يفضل زي ما اخترت
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setProgress(`جاري رفع ${i + 1} من ${files.length}...`);
+        try {
+          const ref = (await uploadToB2("subject-file", folderId, f)).ref;
+          const t = files.length === 1 ? title.trim() || baseName(f.name) : baseName(f.name);
+          const { error } = await supabase.from("content_items").insert({
+            folder_id: folderId, type: "pdf", title: t, description: description.trim() || null, file_url: ref,
+          } as never);
+          if (error) throw error;
+          ok++;
+        } catch {
+          failed.push(f.name);
+        }
+      }
+      setSaving(false);
+      setProgress("");
+      if (failed.length) toast.error(`اتضاف ${ok} من ${files.length}. فشل: ${failed.slice(0, 3).join("، ")}`);
+      else toast.success(files.length > 1 ? `اتضافوا ${ok} ملفات ✨` : "اتضاف المحتوى ✨");
+      if (ok) onDone();
+      else setFiles(files.filter((f) => failed.includes(f.name)));
+      return;
+    }
     if (!title.trim()) return toast.error("اكتب عنوان");
     setSaving(true);
     try {
-      let payload: Record<string, unknown> = { folder_id: folderId, type, title: title.trim(), description: description.trim() || null };
-      if (type === "pdf") {
-        if (!file) throw new Error("اختر ملف PDF");
-        payload.file_url = (await uploadToB2("subject-file", folderId, file)).ref;
-      } else if (type === "youtube") {
+      const payload: Record<string, unknown> = { folder_id: folderId, type, title: title.trim(), description: description.trim() || null };
+      if (type === "youtube") {
         const id = extractYouTubeId(youtubeInput);
         if (!id) throw new Error("رابط يوتيوب غير صحيح");
         payload.youtube_id = id;
@@ -450,8 +537,9 @@ function AddContentModal({ folderId, onClose, onDone }: { folderId: string; onCl
     }
   }
 
+  const multi = type === "pdf" && files.length > 1;
   return (
-    <ModalShell title="محتوى جديد" onClose={onClose}>
+    <ModalShell title="محتوى جديد" onClose={() => !saving && onClose()}>
       <form onSubmit={submit} className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           {(["pdf", "youtube", "link"] as const).map((t) => (
@@ -465,13 +553,40 @@ function AddContentModal({ folderId, onClose, onDone }: { folderId: string; onCl
             </button>
           ))}
         </div>
-        <input className="modal-input" placeholder="العنوان" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        {!multi && (
+          <input
+            className="modal-input"
+            placeholder={type === "pdf" ? "العنوان (اختياري: بنستخدم اسم الملف)" : "العنوان"}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        )}
         <textarea className="modal-input" placeholder="وصف (اختياري)" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
         {type === "pdf" && (
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-dashed border-border bg-background/40 px-4 py-3 text-sm hover:border-accent">
-            <span className="flex items-center gap-2"><Upload className="h-4 w-4 text-accent" />{file ? file.name : "اختر ملف PDF"}</span>
-            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </label>
+          <>
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-dashed border-border bg-background/40 px-4 py-3 text-sm hover:border-accent">
+              <span className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-accent" />
+                {files.length ? `${files.length} ملف: اضغط لإضافة المزيد` : "اختر ملفات PDF (تقدر تختار كذا واحد)"}
+              </span>
+              <input
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+              />
+            </label>
+            {multi && <p className="text-xs text-foreground/60">كل ملف هيتسمّى باسمه، والوصف هيتحط على كلهم</p>}
+            {files.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5 text-xs">
+                <span className="truncate">{f.name}</span>
+                <button type="button" className="shrink-0 text-destructive" onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </>
         )}
         {type === "youtube" && (
           <input className="modal-input" placeholder="رابط YouTube أو ID الفيديو" value={youtubeInput} onChange={(e) => setYoutubeInput(e.target.value)} />
@@ -480,7 +595,7 @@ function AddContentModal({ folderId, onClose, onDone }: { folderId: string; onCl
           <input className="modal-input" placeholder="https://..." value={externalUrl} onChange={(e) => setExternalUrl(e.target.value)} />
         )}
         <button type="submit" disabled={saving} className="w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-          {saving ? "جاري الرفع..." : "إضافة"}
+          {saving ? progress || "جاري الرفع..." : multi ? `إضافة ${files.length} ملفات` : "إضافة"}
         </button>
       </form>
     </ModalShell>
