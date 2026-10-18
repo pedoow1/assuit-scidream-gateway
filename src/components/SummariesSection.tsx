@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  BookOpen, FileText, Globe, ImagePlus, Loader2, Lock, Paperclip, Pencil, Plus, Save, Star, Trash2, X,
+  BookOpen, Download, FileText, Globe, ImagePlus, Loader2, Lock, Paperclip, Pencil, Plus, Save, Star, Trash2, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteFromB2, mu, resolveFileUrl, uploadToB2, useB2Urls } from "@/lib/b2";
+import { downloadFromUrl } from "@/lib/downloadFile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -139,6 +140,15 @@ export function SummariesSection({ userId, own }: { userId: string; own: boolean
     if (w) w.location.href = url; else window.location.href = url;
   }
 
+  async function download(f: FileItem) {
+    const url = await resolveFileUrl(f.ref);
+    if (!url) return toast.error("مقدرتش أنزّل الملف");
+    await downloadFromUrl(url, f.name);
+  }
+  async function downloadAll(list: FileItem[]) {
+    for (const f of list) await download(f);
+  }
+
   async function rate(sm: Sum, n: number) {
     const { error } = await db.rpc("rate_summary", { p_summary: sm.id, p_stars: n });
     if (error) return toast.error(error.message);
@@ -231,17 +241,36 @@ export function SummariesSection({ userId, own }: { userId: string; own: boolean
                 {vImgs.length > 0 && (
                   <div className="grid grid-cols-3 gap-2">
                     {vImgs.map((f) => (
-                      <button key={f.ref} onClick={() => void openFile(f)} className="aspect-square overflow-hidden rounded-xl bg-card/60">
-                        <img src={mu(f.ref)} alt={f.name} className="h-full w-full object-cover" loading="lazy" />
-                      </button>
+                      <div key={f.ref} className="group relative aspect-square overflow-hidden rounded-xl bg-card/60">
+                        <button onClick={() => void openFile(f)} className="h-full w-full">
+                          <img src={mu(f.ref)} alt={f.name} className="h-full w-full object-cover" loading="lazy" />
+                        </button>
+                        <button
+                          onClick={() => void download(f)}
+                          title="تحميل"
+                          className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
                 {vOthers.map((f) => (
-                  <Button key={f.ref} variant="outline" className="w-full justify-start" onClick={() => void openFile(f)}>
-                    <FileText className="ml-2 h-4 w-4 shrink-0 text-accent" /> <span className="truncate">{f.name}</span>
-                  </Button>
+                  <div key={f.ref} className="flex items-center gap-2 rounded-xl border border-border/60 p-1.5">
+                    <Button variant="outline" className="h-auto flex-1 justify-start whitespace-normal py-2 text-right" onClick={() => void openFile(f)}>
+                      <FileText className="ml-2 h-4 w-4 shrink-0 text-accent" /> <span className="break-words">{f.name}</span>
+                    </Button>
+                    <Button size="icon" variant="ghost" title="تحميل" onClick={() => void download(f)}>
+                      <Download className="h-4 w-4 text-accent" />
+                    </Button>
+                  </div>
                 ))}
+                {vFiles.length > 0 && (
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => void downloadAll(vFiles)}>
+                    <Download className="ml-1.5 h-4 w-4" /> {vFiles.length > 1 ? `تحميل الكل (${vFiles.length})` : "تحميل"}
+                  </Button>
+                )}
 
                 {ratable && (
                   <div className="flex flex-col items-center gap-1.5 rounded-2xl bg-card/40 p-3">
@@ -299,7 +328,7 @@ export function SummariesSection({ userId, own }: { userId: string; own: boolean
 
                 {draft.files.map((f) => (
                   <div key={f.ref} className="flex items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2 text-sm">
-                    <span className="truncate">{f.name}</span>
+                    <span className="break-words">{f.name}</span>
                     <button type="button" className="shrink-0 text-destructive"
                       onClick={() => { setDraft({ ...draft, files: draft.files.filter((x) => x.ref !== f.ref) }); setRemoved((r) => [...r, f.ref]); }}>
                       <X className="h-4 w-4" />
@@ -308,7 +337,7 @@ export function SummariesSection({ userId, own }: { userId: string; own: boolean
                 ))}
                 {picked.map((f, i) => (
                   <div key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 rounded-xl border border-accent/40 px-3 py-2 text-sm text-accent">
-                    <span className="truncate">{f.name}</span>
+                    <span className="break-words">{f.name}</span>
                     <button type="button" className="shrink-0 text-destructive" onClick={() => setPicked((p) => p.filter((_, j) => j !== i))}>
                       <X className="h-4 w-4" />
                     </button>
