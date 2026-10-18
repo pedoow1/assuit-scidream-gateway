@@ -13,6 +13,7 @@ import { Logo } from "@/components/Logo";
 import { extractYouTubeId } from "@/lib/youtube";
 import { uploadToB2, deleteFile, resolveFileUrl } from "@/lib/b2";
 import { SortableList } from "@/components/SortableList";
+import { downloadFromUrl } from "@/lib/downloadFile";
 
 export const Route = createFileRoute("/subjects/$subjectId")({
   head: () => ({ meta: [{ title: "المادة — Assuit SciDream" }] }),
@@ -124,6 +125,12 @@ function SubjectDetailPage() {
     if (bad) toast.error((bad as any).error.message);
     else toast.success("اتحفظ الترتيب ✨");
     qc.invalidateQueries({ queryKey: table === "folders" ? ["folders", subjectId] : ["content", subjectId, currentFolderId] });
+  }
+
+  async function downloadPdf(path: string, title: string) {
+    const url = await resolveFileUrl(path, "subject-files", 3600);
+    if (!url) return toast.error("مش قادر ينزّل الملف");
+    await downloadFromUrl(url, /\.pdf$/i.test(title) ? title : `${title}.pdf`);
   }
 
   async function openPdf(path: string) {
@@ -248,7 +255,7 @@ function SubjectDetailPage() {
                       renderRow={(f) => (
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gold/40 to-rose/30"><Folder className="h-4 w-4" /></div>
-                          <div className="truncate font-medium">{f.name}</div>
+                          <div className="break-words font-medium">{f.name}</div>
                         </div>
                       )}
                     />
@@ -298,14 +305,14 @@ function SubjectDetailPage() {
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
                             {it.type === "pdf" ? <FileText className="h-4 w-4 text-rose" /> : it.type === "youtube" ? <Youtube className="h-4 w-4 text-gold" /> : <LinkIcon className="h-4 w-4 text-gold" />}
                           </div>
-                          <div className="truncate text-sm font-medium">{it.title}</div>
+                          <div className="break-words text-sm font-medium">{it.title}</div>
                         </div>
                       )}
                     />
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    {items.map((it) => <ContentRow key={it.id} item={it} isAdmin={isAdmin} onDelete={() => deleteItem(it)} onOpenPdf={openPdf} />)}
+                    {items.map((it) => <ContentRow key={it.id} item={it} isAdmin={isAdmin} onDelete={() => deleteItem(it)} onOpenPdf={openPdf} onDownloadPdf={downloadPdf} />)}
                   </div>
                 )}
               </div>
@@ -355,8 +362,8 @@ function SubjectDetailPage() {
   );
 }
 
-function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
-  item: ContentItem; isAdmin: boolean; onDelete: () => void; onOpenPdf: (path: string) => void;
+function ContentRow({ item, isAdmin, onDelete, onOpenPdf, onDownloadPdf }: {
+  item: ContentItem; isAdmin: boolean; onDelete: () => void; onOpenPdf: (path: string) => void; onDownloadPdf: (path: string, title: string) => void;
 }) {
   if (item.type === "youtube" && item.youtube_id) {
     return (
@@ -394,7 +401,7 @@ function ContentRow({ item, isAdmin, onDelete, onOpenPdf }: {
           </div>
         </button>
         <div className="flex items-center gap-1">
-          <button onClick={() => onOpenPdf(item.file_url!)} className="rounded-full p-2 text-foreground/75 hover:bg-secondary"><Download className="h-4 w-4" /></button>
+          <button onClick={() => onDownloadPdf(item.file_url!, item.title)} title="تحميل" className="rounded-full p-2 text-foreground/75 hover:bg-secondary"><Download className="h-4 w-4" /></button>
           {isAdmin && <button onClick={onDelete} className="rounded-full p-2 text-foreground/75 hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
         </div>
       </div>
