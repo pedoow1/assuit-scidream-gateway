@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Plus, Brain, Clock, Trash2, Edit, Eye, EyeOff, X } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, Brain, Clock, Trash2, Edit, Eye, EyeOff, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { StarsBackground } from "@/components/IntroSequence";
+import { AudienceModal, QuizCreateModal } from "@/components/QuizForms";
 
 export const Route = createFileRoute("/subjects/$subjectId/quizzes/")({
   head: () => ({ meta: [{ title: "اختبارات المادة — Assuit SciDream" }] }),
@@ -20,6 +21,7 @@ interface Quiz {
   pass_score: number;
   is_published: boolean;
   created_at: string;
+  audience?: string;
 }
 
 function QuizzesListPage() {
@@ -29,10 +31,14 @@ function QuizzesListPage() {
   const qc = useQueryClient();
   const isAdmin = isAdminRole(roles);
   const [showCreate, setShowCreate] = useState(false);
+  const [aud, setAud] = useState<Quiz | null>(null);
+
+  // اختبارات من غير مادة بتتعرض في صفحة كل الاختبارات
+  useEffect(() => { if (subjectId === "general") navigate({ to: "/quizzes" }); }, [subjectId, navigate]);
 
   const { data: subject } = useQuery({
     queryKey: ["subject", subjectId],
-    enabled: !!user,
+    enabled: !!user && subjectId !== "general",
     queryFn: async () => {
       const { data } = await supabase.from("subjects").select("id,name_ar,code").eq("id", subjectId).maybeSingle();
       return data;
@@ -41,7 +47,7 @@ function QuizzesListPage() {
 
   const { data: quizzes, isLoading } = useQuery({
     queryKey: ["quizzes", subjectId],
-    enabled: !!user,
+    enabled: !!user && subjectId !== "general",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quizzes")
@@ -122,7 +128,10 @@ function QuizzesListPage() {
                       {q.description && <p className="mt-0.5 text-xs text-foreground/75 line-clamp-1">{q.description}</p>}
                     </div>
                   </div>
-                  {!q.is_published && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px]">مسودة</span>}
+                  <div className="flex gap-1.5">
+                    {!q.is_published && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px]">مسودة</span>}
+                    {q.audience === "specific" && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] text-accent">مخصص</span>}
+                  </div>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-foreground/75">
@@ -145,6 +154,7 @@ function QuizzesListPage() {
                       <button onClick={() => togglePublish(q)} title={q.is_published ? "إخفاء" : "نشر"} className="rounded-full border border-border p-2 hover:border-accent">
                         {q.is_published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
+                      <button onClick={() => setAud(q)} title="الجمهور" className="rounded-full border border-border p-2 hover:border-accent"><Users className="h-4 w-4" /></button>
                       <button onClick={() => deleteQuiz(q)} className="rounded-full border border-border p-2 text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -158,8 +168,8 @@ function QuizzesListPage() {
       </main>
 
       {showCreate && isAdmin && (
-        <CreateQuizModal
-          subjectId={subjectId}
+        <QuizCreateModal
+          fixedSubjectId={subjectId}
           userId={user.id}
           onClose={() => setShowCreate(false)}
           onCreated={(id) => {
@@ -169,64 +179,7 @@ function QuizzesListPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function CreateQuizModal({ subjectId, userId, onClose, onCreated }: { subjectId: string; userId: string; onClose: () => void; onCreated: (id: string) => void }) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [timeLimit, setTimeLimit] = useState<string>("");
-  const [passScore, setPassScore] = useState(50);
-  const [saving, setSaving] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return toast.error("اكتب عنوان الاختبار");
-    setSaving(true);
-    const { data, error } = await supabase
-      .from("quizzes")
-      .insert({
-        subject_id: subjectId,
-        title: title.trim(),
-        description: description.trim() || null,
-        time_limit_min: timeLimit ? Number(timeLimit) : null,
-        pass_score: passScore,
-        created_by: userId,
-      })
-      .select("id")
-      .single();
-    setSaving(false);
-    if (error || !data) { toast.error("فشل الإنشاء"); return; }
-    toast.success("تم الإنشاء — أضف الأسئلة دلوقتي");
-    onCreated(data.id);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur">
-      <div className="cosmic-card w-full max-w-md rounded-2xl bg-card p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl">اختبار جديد</h2>
-          <button onClick={onClose}><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="عنوان الاختبار" className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-sm outline-none focus:border-accent" />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="وصف مختصر (اختياري)" rows={2} className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-sm outline-none focus:border-accent" />
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs text-foreground/75">المدة (دقيقة)</span>
-              <input type="number" value={timeLimit} onChange={(e) => setTimeLimit(e.target.value)} placeholder="بدون حد" className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 outline-none focus:border-accent" />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs text-foreground/75">درجة النجاح %</span>
-              <input type="number" min={0} max={100} value={passScore} onChange={(e) => setPassScore(Number(e.target.value))} className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 outline-none focus:border-accent" />
-            </label>
-          </div>
-          <button disabled={saving} className="mt-2 w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-            {saving ? "جاري الإنشاء..." : "إنشاء"}
-          </button>
-        </form>
-      </div>
+      {aud && <AudienceModal quiz={aud} onClose={() => setAud(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["quizzes", subjectId] })} />}
     </div>
   );
 }
