@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveFileUrl } from "@/lib/b2";
+import { UpdateReleaseAdmin } from "@/components/UpdateReleaseAdmin";
 
 // New tables/RPCs are not in the generated types yet.
 const db = supabase as any;
@@ -58,6 +59,7 @@ function fmt(k: string, v: any) {
 export function BigBossPanel() {
   return (
     <div className="space-y-8">
+      <UpdateReleaseAdmin />
       <UploadSwitches />
       <IntelAgent />
     </div>
