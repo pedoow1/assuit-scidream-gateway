@@ -14,18 +14,21 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
-    // Any OpenAI-compatible provider works: set AI_API_KEY (+ optionally AI_BASE_URL / AI_MODEL).
-    // Falls back to MISTRAL_API_KEY so the old setup keeps working.
-    const key = process.env.AI_API_KEY || process.env.MISTRAL_API_KEY;
-    if (!key) throw new Error("AI_API_KEY غير مضبوط على السيرفر");
-    const baseUrl = (process.env.AI_BASE_URL || "https://api.mistral.ai/v1").replace(/\/$/, "");
+    // Mistral only (same provider as the app). AI_BASE_URL / AI_MODEL are deliberately ignored
+    // so leftover OpenRouter/Gemini values from the Edge Function setup can't hijack the website.
+    // Key: MISTRAL_API_KEY first; AI_API_KEY is accepted only if it isn't an OpenRouter key.
+    const legacyKey = process.env.AI_API_KEY;
+    const key =
+      process.env.MISTRAL_API_KEY || (legacyKey && !legacyKey.startsWith("sk-or-") ? legacyKey : undefined);
+    if (!key) throw new Error("MISTRAL_API_KEY غير مضبوط على السيرفر (Vercel ← Environment Variables)");
+    const baseUrl = "https://api.mistral.ai/v1";
 
     const systemPrompt = buildSystemPrompt(
       data.messages.filter((m) => m.role === "user").map((m) => m.content),
     );
 
     const body = {
-      model: process.env.AI_MODEL || "ministral-14b-2512",
+      model: process.env.MISTRAL_MODEL || "mistral-small-latest",
       messages: [
         { role: "system", content: systemPrompt },
         ...data.messages.slice(-20),
@@ -61,7 +64,10 @@ export const chatWithAssistant = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`AI provider error ${res.status}: ${txt.slice(0, 300)}`);
+      if (res.status === 401) {
+        throw new Error("مفتاح Mistral غلط أو منتهي — راجع MISTRAL_API_KEY في Vercel");
+      }
+      throw new Error(`Mistral error ${res.status}: ${txt.slice(0, 300)}`);
     }
     const raw = await res.text();
     let json: any;
