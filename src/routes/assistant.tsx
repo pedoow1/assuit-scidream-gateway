@@ -1,20 +1,65 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Send, Sparkles, ArrowRight, Trash2 } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { StarsBackground } from "@/components/IntroSequence";
-import { chatWithAssistant, type ChatMessage } from "@/lib/assistant.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { buildSystemPrompt } from "@/lib/college-knowledge";
+import type { ChatMessage } from "@/lib/assistant.functions";
+
+// اسم الـ Edge Function بتاعة المساعد على Supabase (نفس اللي التطبيق بيكلّمها).
+// المفتاح والموديل (AI_API_KEY / AI_MODELS) متخزنين في Secrets بتاعتها.
+const ASSISTANT_FUNCTION = "assistant-chat";
+
+async function askOnce(messages: ChatMessage[]): Promise<{ reply: string }> {
+  const system = buildSystemPrompt(messages.filter((m) => m.role === "user").map((m) => m.content));
+  const { data, error } = await supabase.functions.invoke(ASSISTANT_FUNCTION, {
+    body: { messages: [{ role: "system", content: system }, ...messages.slice(-20)] },
+  });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") {
+      try {
+        const j = await ctx.json();
+        if (j?.error) msg = String(j.error);
+      } catch {
+        /* body wasn't JSON */
+      }
+    }
+    if (ctx?.status === 404) {
+      msg = `الـ Edge Function "${ASSISTANT_FUNCTION}" مش موجودة على مشروع Supabase ده`;
+    }
+    throw new Error(msg);
+  }
+  if (data?.error) throw new Error(String(data.error));
+  return { reply: (data?.reply as string) ?? "" };
+}
 
 export const Route = createFileRoute("/assistant")({
   head: () => ({ meta: [{ title: "المساعد الذكي — Assuit SciDream" }] }),
   component: AssistantPage,
 });
 
+const RATE_LIMIT_RE = /rate.?limit|429|too many|quota/i;
+
+// لو المزوّد رد بـ rate limit، نحاول تاني تلقائياً مرتين قبل ما نظهر خطأ.
+async function askAssistant(messages: ChatMessage[]): Promise<{ reply: string }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await askOnce(messages);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (!RATE_LIMIT_RE.test(msg)) throw e;
+      if (attempt >= 2) throw new Error("المساعد مشغول دلوقتي (ضغط على الخدمة) — جرب بعد دقيقة");
+      await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+    }
+  }
+}
+
 function AssistantPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const chat = useServerFn(chatWithAssistant);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -41,9 +86,9 @@ function AssistantPage() {
       // Safety net: never let the UI spin forever, even if something
       // upstream hangs instead of returning an error.
       const result = await Promise.race([
-        chat({ data: { messages: next } }),
+        askAssistant(next),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("محدش رد خلال 30 ثانية — جرب تاني")), 30_000),
+          setTimeout(() => reject(new Error("محدش رد خلال 50 ثانية — جرب تاني")), 50_000),
         ),
       ]);
       setMessages([...next, { role: "assistant", content: result.reply || "..." }]);
