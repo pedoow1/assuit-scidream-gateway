@@ -22,7 +22,7 @@ export type AppRole = "super_admin" | "admin" | "student" | "department_advisor"
 
 const SUPER_ADMIN_EMAIL = "abdalahkotp31@gmail.com";
 
-function isSuperAdminEmail(email?: string | null) {
+export function isSuperAdminEmail(email?: string | null) {
   return email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
 }
 
