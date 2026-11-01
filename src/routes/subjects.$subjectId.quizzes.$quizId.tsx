@@ -34,6 +34,7 @@ interface Quiz {
   time_limit_min: number | null;
   pass_score: number;
   is_published: boolean;
+  kind: "training" | "exam";
 }
 
 function QuizPage() {
@@ -41,6 +42,14 @@ function QuizPage() {
   const { user, roles, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isAdmin = isAdminRole(roles);
+  const [isStaff, setIsStaff] = useState(false);
+  const canManage = isAdmin || isStaff;
+
+  // دكتور/معيد المادة يقدر يدير اختباراتها برضه، مش بس الأدمن
+  useEffect(() => {
+    if (!user || !subjectId) return;
+    void supabase.rpc("is_subject_staff", { p_uid: user.id, p_subject: subjectId }).then(({ data }) => setIsStaff(!!data));
+  }, [user?.id, subjectId]);
 
   const { data: quiz, isLoading: quizLoading } = useQuery({
     queryKey: ["quiz", quizId],
@@ -80,7 +89,7 @@ function QuizPage() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-5xl px-6 py-10">
-        {isAdmin ? (
+        {canManage ? (
           <AdminQuizManager quiz={quiz} questions={questions ?? []} />
         ) : (
           <TakeQuiz quiz={quiz} questions={questions ?? []} userId={user.id} subjectId={subjectId} />
@@ -107,6 +116,8 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [showGrading, setShowGrading] = useState(false);
 
   async function deleteQ(id: string) {
     if (!confirm("حذف السؤال؟")) return;
@@ -125,10 +136,19 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
           {quiz.time_limit_min && <span className="rounded-full bg-secondary px-3 py-1">{quiz.time_limit_min} دقيقة</span>}
           <span className="rounded-full bg-secondary px-3 py-1">نجاح: {quiz.pass_score}%</span>
           <span className={`rounded-full px-3 py-1 ${quiz.is_published ? "bg-gold/30" : "bg-secondary"}`}>{quiz.is_published ? "منشور" : "مسودة"}</span>
+          <span className="rounded-full bg-secondary px-3 py-1">{quiz.kind === "exam" ? "امتحان" : "تدريب"}</span>
         </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
+        <button onClick={() => setShowResults(true)} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:border-accent">
+          درجات الطلبة
+        </button>
+        {quiz.kind === "exam" && (
+          <button onClick={() => setShowGrading(true)} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:border-accent">
+            تصحيح الإجابات المقالية
+          </button>
+        )}
         <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
           <Plus className="h-4 w-4" /> إضافة سؤال
         </button>
@@ -178,7 +198,180 @@ function AdminQuizManager({ quiz, questions }: { quiz: Quiz; questions: Question
 
       {showAdd && <AddQuestionModal quizId={quiz.id} nextOrder={questions.length} onClose={() => setShowAdd(false)} />}
       {showImport && <BulkImportModal quizId={quiz.id} startOrder={questions.length} onClose={() => setShowImport(false)} />}
+      {showResults && <QuizResultsModal quiz={quiz} questions={questions} onClose={() => setShowResults(false)} />}
+      {showGrading && <GradeEssaysModal quiz={quiz} questions={questions} onClose={() => setShowGrading(false)} />}
     </>
+  );
+}
+
+/* ---------------- درجات كل الطلبة (تدريب وامتحان) ---------------- */
+
+type ResultRow = { id: string; user_id: string; name: string; score: number | null; total_points: number | null; needs_review: boolean; submitted_at: string | null };
+
+function QuizResultsModal({ quiz, questions, onClose }: { quiz: Quiz; questions: Question[]; onClose: () => void }) {
+  const [rows, setRows] = useState<ResultRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const totalPoints = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("quiz_attempts")
+        .select("id,user_id,score,total_points,needs_review,submitted_at")
+        .eq("quiz_id", quiz.id)
+        .not("submitted_at", "is", null)
+        .order("submitted_at", { ascending: false });
+      const list = (data as any[]) ?? [];
+      const ids = Array.from(new Set(list.map((r) => r.user_id)));
+      const { data: profs } = ids.length ? await supabase.from("profiles").select("id,full_name").in("id", ids) : { data: [] as any[] };
+      const names: Record<string, string> = {};
+      ((profs as any[]) ?? []).forEach((p) => { names[p.id] = p.full_name ?? "—"; });
+      setRows(list.map((r) => ({ ...r, name: names[r.user_id] ?? "—" })));
+      setLoading(false);
+    })();
+  }, [quiz.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="cosmic-card max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-lg">درجات: {quiz.title}</h3>
+          <button onClick={onClose} className="text-foreground/75 hover:text-foreground">✕</button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>
+        ) : rows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-foreground/75">لسه محدش سلّم الاختبار ده.</p>
+        ) : (
+          <>
+            <p className="text-xs text-foreground/60">{rows.length} طالب سلّموا{totalPoints ? ` — من إجمالي ${totalPoints} درجة` : ""}</p>
+            <div className="mt-3 space-y-2">
+              {rows.map((r) => {
+                const total = r.total_points ?? totalPoints;
+                const pct = r.score !== null && total ? Math.round((r.score / total) * 100) : null;
+                const passed = pct !== null && pct >= quiz.pass_score;
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2 text-sm">
+                    <span className="flex-1">{r.name}</span>
+                    {r.needs_review ? (
+                      <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] text-accent">محتاج تصحيح</span>
+                    ) : (
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] ${passed ? "bg-green-600/20 text-green-400" : "bg-secondary text-foreground/70"}`}>
+                        {r.score ?? "—"}{total ? `/${total}` : ""}{pct !== null ? ` (${pct}%)` : ""}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- تصحيح الإجابات المقالية ---------------- */
+
+type PendingAttempt = { id: string; user_id: string; name: string; answers: Record<string, string> };
+
+function GradeEssaysModal({ quiz, questions, onClose }: { quiz: Quiz; questions: Question[]; onClose: () => void }) {
+  const essayQs = questions.filter((q) => q.type === "essay");
+  const [attempts, setAttempts] = useState<PendingAttempt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [grades, setGrades] = useState<Record<string, { score: string; feedback: string }>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("quiz_attempts")
+      .select("id,user_id,answers")
+      .eq("quiz_id", quiz.id)
+      .eq("needs_review", true)
+      .not("submitted_at", "is", null);
+    const list = (data as any[]) ?? [];
+    const ids = Array.from(new Set(list.map((r) => r.user_id)));
+    const { data: profs } = ids.length ? await supabase.from("profiles").select("id,full_name").in("id", ids) : { data: [] as any[] };
+    const names: Record<string, string> = {};
+    ((profs as any[]) ?? []).forEach((p) => { names[p.id] = p.full_name ?? "—"; });
+    setAttempts(list.map((r) => ({ id: r.id, user_id: r.user_id, name: names[r.user_id] ?? "—", answers: r.answers ?? {} })));
+    setLoading(false);
+  }
+  useEffect(() => { void load(); }, [quiz.id]);
+
+  async function save(attemptId: string, questionId: string, maxPoints: number) {
+    const key = `${attemptId}:${questionId}`;
+    const g = grades[key];
+    const score = Math.max(0, Math.min(maxPoints, Math.round(Number(g?.score ?? 0) || 0)));
+    setSavingKey(key);
+    const { error } = await supabase.from("quiz_essay_grades").upsert({
+      attempt_id: attemptId, question_id: questionId, score, feedback: g?.feedback?.trim() || null,
+    } as never, { onConflict: "attempt_id,question_id" });
+    setSavingKey(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("اتحفظت الدرجة");
+    await load();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="cosmic-card max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-lg">تصحيح الإجابات المقالية: {quiz.title}</h3>
+          <button onClick={onClose} className="text-foreground/75 hover:text-foreground">✕</button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>
+        ) : attempts.length === 0 ? (
+          <p className="py-10 text-center text-sm text-foreground/75">مفيش محاولات محتاجة تصحيح دلوقتي.</p>
+        ) : (
+          <div className="space-y-5">
+            {attempts.map((a) => (
+              <div key={a.id} className="rounded-2xl border border-border/60 p-4">
+                <p className="font-semibold">{a.name}</p>
+                <div className="mt-3 space-y-4">
+                  {essayQs.map((q) => {
+                    const key = `${a.id}:${q.id}`;
+                    const given = a.answers?.[q.id] ?? "";
+                    return (
+                      <div key={q.id} className="rounded-xl bg-background/40 p-3">
+                        <p className="text-sm font-medium">{q.prompt}</p>
+                        <p className="mt-1 whitespace-pre-wrap rounded-lg bg-secondary/40 p-2 text-sm text-foreground/85">{given || "— بدون إجابة —"}</p>
+                        {q.explanation && <p className="mt-1 text-xs text-foreground/60">💡 الإجابة النموذجية: {q.explanation}</p>}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <input
+                            type="number" min={0} max={q.points}
+                            placeholder={`الدرجة من ${q.points}`}
+                            value={grades[key]?.score ?? ""}
+                            onChange={(e) => setGrades((g) => ({ ...g, [key]: { ...g[key], score: e.target.value } }))}
+                            className="w-28 rounded-lg border border-border bg-background/60 px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
+                          />
+                          <input
+                            placeholder="ملاحظة (اختياري)"
+                            value={grades[key]?.feedback ?? ""}
+                            onChange={(e) => setGrades((g) => ({ ...g, [key]: { ...g[key], feedback: e.target.value } }))}
+                            className="flex-1 min-w-[140px] rounded-lg border border-border bg-background/60 px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
+                          />
+                          <button
+                            onClick={() => save(a.id, q.id, q.points)}
+                            disabled={savingKey === key}
+                            className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                          >
+                            {savingKey === key ? "جاري الحفظ..." : "حفظ الدرجة"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -477,14 +670,18 @@ function TakeQuiz({ quiz, questions, userId, subjectId }: { quiz: Quiz; question
     const pct = total ? (earned / total) * 100 : 0;
     setSubmitted({ score: earned, total, pct, details });
 
+    // answers لازم تتخزن كـ { [question_id]: الإجابة } — ده الشكل اللي calc_quiz_attempt
+    // (ودالة تصحيح المقالي) بتستناه؛ لو اتخزنت كـ array الاختبار يفضل عالق "محتاج مراجعة" للأبد.
+    const hasEssay = questions.some((q) => q.type === "essay");
     await supabase.from("quiz_attempts").insert({
       quiz_id: quiz.id,
       user_id: userId,
       submitted_at: new Date().toISOString(),
       score: earned,
       total_points: total,
-      answers: details.map((d) => ({ question_id: d.q.id, response: d.given, is_correct: d.correct, points: d.correct ? d.q.points : 0 })),
-    });
+      needs_review: hasEssay,
+      answers,
+    } as never);
     qc.invalidateQueries({ queryKey: ["quiz-attempts"] });
   }
 
