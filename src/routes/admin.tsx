@@ -324,6 +324,8 @@ function VerificationTab() {
 type AdminRow = { user_id: string; role: "admin" | "super_admin"; profile: ProfileRow | null };
 type UserRow = ProfileRow & { roles: AppRole[] };
 
+type Subj = { id: string; code: string; name_ar: string };
+
 function AdminsTab() {
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [allUsers, setAllUsers] = useState<UserRow[]>([]);
@@ -331,6 +333,39 @@ function AdminsTab() {
   const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+
+  // تعيين دكتور لمادة معينة: لازم نختار المواد وقت ما ندّي الدور
+  const [subjects, setSubjects] = useState<Subj[]>([]);
+  const [assigning, setAssigning] = useState<UserRow | null>(null);
+  const [assignQuery, setAssignQuery] = useState("");
+  const [assignSelected, setAssignSelected] = useState<string[]>([]);
+  const [assignBusy, setAssignBusy] = useState(false);
+
+  async function ensureSubjects() {
+    if (subjects.length) return;
+    const { data } = await supabase.from("subjects").select("id,code,name_ar").order("name_ar");
+    setSubjects((data as Subj[]) ?? []);
+  }
+  async function openAssign(u: UserRow) {
+    await ensureSubjects();
+    setAssignQuery(""); setAssignSelected([]); setAssigning(u);
+  }
+  async function saveAssign() {
+    if (!assigning) return;
+    if (assignSelected.length === 0) { toast.error("اختار مادة واحدة على الأقل"); return; }
+    setAssignBusy(true);
+    const { error: e1 } = await supabase.from("user_roles").insert({ user_id: assigning.id, role: "instructor" } as never);
+    if (e1 && e1.code !== "23505") { toast.error(e1.message); setAssignBusy(false); return; }
+    const { error: e2 } = await supabase.from("subject_staff").upsert(
+      assignSelected.map((sid) => ({ subject_id: sid, user_id: assigning.id, role_in_subject: "instructor" })) as never,
+      { onConflict: "subject_id,user_id" },
+    );
+    setAssignBusy(false);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success("تم تعيينه دكتور للمواد المختارة ✨");
+    setAssigning(null);
+    await load();
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -410,11 +445,12 @@ function AdminsTab() {
       .delete()
       .eq("user_id", userId)
       .eq("role", role);
-    if (error) toast.error("فشل الإزالة");
-    else {
-      toast.success("تمت الإزالة");
-      load();
+    if (error) { toast.error("فشل الإزالة"); return; }
+    if (role === "instructor") {
+      await supabase.from("subject_staff").delete().eq("user_id", userId).eq("role_in_subject", "instructor");
     }
+    toast.success("تمت الإزالة");
+    load();
   }
 
   const filtered = allUsers.filter((u) => {
@@ -552,7 +588,7 @@ function AdminsTab() {
                     )}
                     {!isSuper && !isInstructor && (
                       <button
-                        onClick={() => promoteById(u.id, "instructor")}
+                        onClick={() => openAssign(u)}
                         className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold hover:border-accent"
                       >
                         <UserPlus className="h-3.5 w-3.5" /> دكتور
@@ -591,6 +627,50 @@ function AdminsTab() {
           </ul>
         )}
       </div>
+
+      {assigning && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => !assignBusy && setAssigning(null)}
+        >
+          <div className="cosmic-card max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg">تعيين دكتور: {assigning.full_name}</h3>
+              <button onClick={() => !assignBusy && setAssigning(null)} className="text-foreground/75 hover:text-foreground">✕</button>
+            </div>
+            <p className="text-sm text-foreground/75">اختار المادة أو المواد اللي هيبقى دكتورها:</p>
+            <input
+              value={assignQuery}
+              onChange={(e) => setAssignQuery(e.target.value)}
+              placeholder="دوّر عن مادة..."
+              className="mt-2 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm focus:border-accent focus:outline-none"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {subjects
+                .filter((sub) => !assignQuery.trim() || sub.name_ar.includes(assignQuery.trim()) || sub.code.toLowerCase().includes(assignQuery.trim().toLowerCase()))
+                .map((sub) => {
+                  const on = assignSelected.includes(sub.id);
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => setAssignSelected((l) => (on ? l.filter((x) => x !== sub.id) : [...l, sub.id]))}
+                      className={`rounded-full border px-3 py-1 text-xs ${on ? "border-accent bg-accent/20 text-accent" : "border-border"}`}
+                    >
+                      {sub.name_ar}
+                    </button>
+                  );
+                })}
+            </div>
+            <button
+              onClick={saveAssign}
+              disabled={assignBusy}
+              className="mt-5 w-full rounded-full bg-gradient-cosmic py-2.5 text-sm font-semibold text-primary-foreground shadow-rose disabled:opacity-60"
+            >
+              {assignBusy ? "جاري التعيين..." : "تأكيد التعيين"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
