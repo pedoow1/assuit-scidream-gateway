@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
-import { ArrowLeft, LogIn } from "lucide-react";
+import { ArrowLeft, LogIn, MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -113,10 +113,14 @@ function AuthPage() {
           </p>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-foreground/75">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2 text-xs text-foreground/75">
           <LogIn className="h-3.5 w-3.5" />
           محتاج مساعدة؟ راسلنا على{" "}
           <a className="text-foreground hover:text-accent" href="mailto:abdalahkotp31@gmail.com">abdalahkotp31@gmail.com</a>
+          <span className="text-foreground/40">·</span>
+          <a className="inline-flex items-center gap-1 text-foreground hover:text-accent" href="https://wa.me/201030380348" target="_blank" rel="noreferrer">
+            <MessageCircle className="h-3.5 w-3.5" /> واتساب
+          </a>
         </div>
       </div>
     </div>
