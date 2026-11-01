@@ -8,6 +8,7 @@ export interface ProfileRow {
   full_name: string | null;
   academic_id: string | null;
   phone: string | null;
+  whatsapp: string | null;
   id_card_url: string | null;
   is_verified: boolean;
   verification_status: "incomplete" | "pending" | "verified" | "rejected";
@@ -18,7 +19,7 @@ export interface ProfileRow {
   bio: string | null;
 }
 
-export type AppRole = "super_admin" | "admin" | "student" | "department_advisor" | "instructor";
+export type AppRole = "super_admin" | "admin" | "student" | "department_advisor" | "instructor" | "assistant";
 
 const SUPER_ADMIN_EMAIL = "abdalahkotp31@gmail.com";
 
@@ -168,6 +169,11 @@ export function isInstructorRole(roles: AppRole[]) {
   return roles.includes("instructor") || isAdminRole(roles);
 }
 
+/** دكتور أو معيد أو أدمن — أي حد له حق "لوحة الدكتور" وإعلانات المواد */
+export function isSubjectStaffRole(roles: AppRole[]) {
+  return roles.includes("instructor") || roles.includes("assistant") || isAdminRole(roles);
+}
+
 /** Label to show next to a person's name: their custom display_title if set,
  * otherwise a sensible default for their highest role. */
 export function displayTitleFor(profile: ProfileRow | null, roles: AppRole[]) {
@@ -175,6 +181,7 @@ export function displayTitleFor(profile: ProfileRow | null, roles: AppRole[]) {
   if (roles.includes("super_admin")) return "Super Admin";
   if (roles.includes("department_advisor")) return "المشرف الأكاديمي";
   if (roles.includes("instructor")) return "د.";
+  if (roles.includes("assistant")) return "م.";
   if (roles.includes("admin")) return "Admin";
   return null;
 }
