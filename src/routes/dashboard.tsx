@@ -19,7 +19,7 @@ import {
   Timer,
   LifeBuoy,
 } from "lucide-react";
-import { useAuth, isAdminRole } from "@/lib/auth";
+import { useAuth, isAdminRole, isSubjectStaffRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { StarsBackground } from "@/components/IntroSequence";
 import { Logo } from "@/components/Logo";
@@ -146,6 +146,7 @@ function Dashboard() {
   }
 
   const isAdmin = isOwnerAdmin || isAdminRole(roles);
+  const isSubjectStaff = isSubjectStaffRole(roles);
 
   const currentData =
     activeTab === "auditoriums" ? AUDITORIUMS : activeTab === "classrooms" ? CLASSROOMS : LABS;
@@ -173,6 +174,14 @@ function Dashboard() {
             >
               <UserCircle className="h-3.5 w-3.5" /> بروفايلي
             </Link>
+            {isSubjectStaff && (
+              <Link
+                to="/staff-dashboard"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-xs hover:border-accent"
+              >
+                لوحة الدكتور
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 to="/admin"
