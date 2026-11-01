@@ -25,7 +25,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "verification" | "admins" | "applications" | "control";
+type Tab = "verification" | "staff" | "admins" | "applications" | "control";
 
 const OWNER_EMAIL = "abdalahkotp31@gmail.com";
 
@@ -84,6 +84,9 @@ function AdminPage() {
           <TabBtn active={tab === "verification"} onClick={() => setTab("verification")}>
             مراجعة الطلاب
           </TabBtn>
+          <TabBtn active={tab === "staff"} onClick={() => setTab("staff")}>
+            طلبات الدكاترة والمعيدين
+          </TabBtn>
           <TabBtn active={tab === "applications"} onClick={() => setTab("applications")}>
             طلبات اللجان
           </TabBtn>
@@ -101,6 +104,7 @@ function AdminPage() {
 
         <div className="mt-6">
           {tab === "verification" && <VerificationTab />}
+          {tab === "staff" && <StaffApplicationsTab />}
           {tab === "applications" && <ApplicationsTab />}
           {tab === "admins" && isSuper && <AdminsTab />}
           {tab === "control" && isSuper && <BigBossPanel />}
@@ -325,6 +329,113 @@ type AdminRow = { user_id: string; role: "admin" | "super_admin"; profile: Profi
 type UserRow = ProfileRow & { roles: AppRole[] };
 
 type Subj = { id: string; code: string; name_ar: string };
+
+type StaffApp = {
+  id: string;
+  user_id: string;
+  requested_role: "instructor" | "assistant";
+  subject_ids: string[];
+  phone: string;
+  whatsapp: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+function StaffApplicationsTab() {
+  const [rows, setRows] = useState<StaffApp[]>([]);
+  const [subjectNames, setSubjectNames] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("staff_applications")
+      .select("id,user_id,requested_role,subject_ids,phone,whatsapp,status,created_at,profiles:user_id(full_name,email)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    const list = ((data as any[]) ?? []).map((r) => ({
+      ...r, full_name: r.profiles?.full_name ?? null, email: r.profiles?.email ?? null,
+    })) as StaffApp[];
+    setRows(list);
+
+    const allIds = Array.from(new Set(list.flatMap((r) => r.subject_ids ?? [])));
+    if (allIds.length) {
+      const { data: subs } = await supabase.from("subjects").select("id,name_ar").in("id", allIds);
+      const map: Record<string, string> = {};
+      ((subs as any[]) ?? []).forEach((s) => { map[s.id] = s.name_ar; });
+      setSubjectNames(map);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function decide(app: StaffApp, approve: boolean) {
+    let reason: string | null = null;
+    if (!approve) {
+      reason = window.prompt("سبب الرفض (اختياري):") ?? "";
+    }
+    setBusyId(app.id);
+    const { error } = await supabase.rpc("approve_staff_application", {
+      p_app_id: app.id, p_approve: approve, p_reason: reason || null,
+    } as never);
+    setBusyId(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(approve ? "تم قبول الطلب وتفعيل الحساب ✨" : "تم رفض الطلب");
+    await load();
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div>;
+  }
+
+  return (
+    <div>
+      <h2 className="font-display text-lg">طلبات الدكاترة والمعيدين ({rows.length})</h2>
+      {rows.length === 0 ? (
+        <p className="mt-8 text-center text-sm text-foreground/75">مفيش طلبات معلّقة دلوقتي.</p>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {rows.map((r) => (
+            <div key={r.id} className="cosmic-card rounded-2xl p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{r.full_name ?? "—"} <span className="ms-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-normal">{r.requested_role === "instructor" ? "دكتور" : "معيد"}</span></p>
+                  <p className="text-xs text-foreground/60">{r.email}</p>
+                  <p className="text-xs text-foreground/60">موبايل: {r.phone} · واتساب: {r.whatsapp}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => decide(r, true)}
+                    disabled={busyId === r.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> قبول
+                  </button>
+                  <button
+                    onClick={() => decide(r, false)}
+                    disabled={busyId === r.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-destructive/50 px-3.5 py-1.5 text-xs font-semibold text-destructive disabled:opacity-60"
+                  >
+                    <XCircle className="h-3.5 w-3.5" /> رفض
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {(r.subject_ids ?? []).map((sid) => (
+                  <span key={sid} className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px]">{subjectNames[sid] ?? "..."}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminsTab() {
   const [rows, setRows] = useState<AdminRow[]>([]);
