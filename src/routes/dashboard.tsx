@@ -17,6 +17,7 @@ import {
   GraduationCap,
   MessagesSquare,
   Timer,
+  LifeBuoy,
 } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +46,12 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
     label: "قسم الكيمياء الصناعية",
     color: "from-rose/50 to-gold/50",
     to: "/department",
+  },
+  {
+    icon: LifeBuoy,
+    label: "قسم الدعم",
+    color: "from-cosmic/40 to-gold/40",
+    to: "/support",
   },
 ];
 
@@ -286,6 +293,20 @@ function Dashboard() {
             </table>
           </div>
         </div>
+
+        {/* Support / WhatsApp */}
+        <a
+          href="https://wa.me/201030380348"
+          target="_blank"
+          rel="noreferrer"
+          className="cosmic-card flex items-center gap-4 rounded-3xl p-6 transition hover:-translate-y-0.5 hover:shadow-glow"
+        >
+          <LifeBuoy className="h-6 w-6 shrink-0 text-accent" />
+          <div>
+            <h2 className="font-display text-base">محتاج مساعدة؟ كلّمنا على واتساب</h2>
+            <p className="mt-0.5 text-sm text-foreground/75">+20 103 038 0348</p>
+          </div>
+        </a>
       </main>
     </div>
   );
