@@ -53,6 +53,12 @@ const QUICK: { icon: typeof BookOpen; label: string; color: string; to?: string 
     color: "from-cosmic/40 to-gold/40",
     to: "/support",
   },
+  {
+    icon: Sparkles,
+    label: "المنشورات",
+    color: "from-rose/50 to-cosmic/50",
+    to: "/community",
+  },
 ];
 
 const AUDITORIUMS = [
